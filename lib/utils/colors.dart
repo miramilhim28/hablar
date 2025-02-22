@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-const purpleLilac = Color.fromRGBO(235, 138, 235, 1);
+const purpleLilac = Color.fromRGBO(246, 142, 246, 1);
 const lightGrey = Color.fromRGBO(245, 245, 245, 1);
 const darkPurple = Color.fromRGBO(108, 70, 117, 1);
 const darkGrey = Color.fromRGBO(51, 51, 51, 1);

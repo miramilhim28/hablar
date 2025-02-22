@@ -23,8 +23,8 @@ class SplashScreen extends StatelessWidget {
           ),
           child: Center(
             child: Image.asset('assets/hablar_logo.png',
-            width: 271,
-            height: 48,
+            width: 270,
+            height: 50,
             ),
           ),
         ),
