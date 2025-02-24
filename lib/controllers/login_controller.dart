@@ -8,7 +8,7 @@ class LoginController extends GetxController {
 
   static var signIn;
 
-  void logIn() {
+  void loginUser() {
     if (phoneController.text.isEmpty || passwordController.text.isEmpty) {
       Get.snackbar('Error', 'All fields are required',
           snackPosition: SnackPosition.BOTTOM);
@@ -19,7 +19,7 @@ class LoginController extends GetxController {
 
     Future.delayed(const Duration(seconds: 2), () {
       isLoading.value = false;
-      Get.snackbar('Success', 'Signed in successfully!',
+      Get.snackbar('Success', 'Logged in successful!',
           snackPosition: SnackPosition.BOTTOM);
     });
   }

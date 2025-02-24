@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get_state_manager/get_state_manager.dart';
+import 'package:hablar/screens/signup_screen.dart';
 import 'package:hablar/utils/colors.dart' as utils;
 import 'package:hablar/controllers/login_controller.dart';
 import 'package:get/get.dart';
@@ -81,7 +81,9 @@ class LoginScreen extends StatelessWidget {
 
             //LogIn Button:
             Obx(() => ElevatedButton(
-                onPressed: (){},
+                onPressed: _loginController.isLoading.value
+                    ? null
+                    : _loginController.loginUser,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: utils.darkPurple,
                   foregroundColor: utils.white,
@@ -89,7 +91,7 @@ class LoginScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                      const EdgeInsets.all(14),
                 ),
                 child: _loginController.isLoading.value
                     ? const SizedBox(
@@ -121,7 +123,7 @@ class LoginScreen extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () =>
-                      Get.snackbar('Sign Up', 'Navigate to Sign Up screen'),
+                      Get.to(() => SignupScreen()),
                   child: const Text(
                     'Sign Up',
                     style: TextStyle(

@@ -6,11 +6,11 @@ class SplashController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _navigateToHome();
+    _navigateToLogin();
   }
 
-  void _navigateToHome() async {
+  void _navigateToLogin() async {
     await Future.delayed(const Duration(seconds: 3));
-    Get.off(() => LoginScreen()); // Navigate to HomeScreen after splash
+    Get.off(() => LoginScreen()); // Navigate to LoginScreen after splash
   }
 }
