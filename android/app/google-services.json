@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "4969617579",
+    "project_id": "hablar-49ee3",
+    "storage_bucket": "hablar-49ee3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:4969617579:android:2c629cb050c80de7aa3fee",
+        "android_client_info": {
+          "package_name": "com.example.hablar_clone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0u2s-jH3F3Ni9v661ViUJmnjYcDr7bEc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
