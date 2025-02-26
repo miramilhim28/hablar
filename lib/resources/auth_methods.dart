@@ -38,6 +38,8 @@ class AuthMethods {
           name: name,
           email: email,
           photoUrl: '',
+          password: password,
+          phone: '',
           uid: '',
           bio: '',
           history: [],

@@ -1,5 +1,4 @@
 import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:confirm_dialog/confirm_dialog.dart';
@@ -80,14 +79,14 @@ class EditScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            //bio
+            //email
             SizedBox(
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().bioController,
+                controller: SettingsController().emailController,
                 decoration: InputDecoration(
-                  hintText: 'Edit Bio',
+                  hintText: 'Edit Email',
                   filled: true,
                   fillColor: utils.lightGrey,
                   border: OutlineInputBorder(
@@ -104,9 +103,47 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().bioController,
+                controller: SettingsController().phoneController,
                 decoration: InputDecoration(
                   hintText: 'Edit Phone Number',
+                  filled: true,
+                  fillColor: utils.lightGrey,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            //password
+            SizedBox(
+              width: 300,
+              height: 50,
+              child: TextField(
+                controller: SettingsController().passwordController,
+                decoration: InputDecoration(
+                  hintText: 'Edit Password',
+                  filled: true,
+                  fillColor: utils.lightGrey,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            //bio
+            SizedBox(
+              width: 300,
+              height: 50,
+              child: TextField(
+                controller: SettingsController().bioController,
+                decoration: InputDecoration(
+                  hintText: 'Edit Bio',
                   filled: true,
                   fillColor: utils.lightGrey,
                   border: OutlineInputBorder(

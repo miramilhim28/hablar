@@ -57,23 +57,33 @@ class ContactScreen extends StatelessWidget {
               ),
               SizedBox(height: 16),
               Expanded(
-                child: Obx(() => ListView.builder(
-                  itemCount: controller.contacts.length,
-                  itemBuilder: (context, index) {
-                    final contact = controller.filteredContacts[index];
-                    return Column(
-                      children: [
-                        ListTile(
-                          title: Text(
-                            contact.name,
-                            style: TextStyle(color: utils.darkGrey),
-                          ),
-                        ),
-                        Divider(thickness: 1, color: utils.darkGrey),
-                      ],
-                    );
-                  },
-                ),),
+                child: Obx(
+                    () => ListView.builder(
+                      itemCount: controller.filteredContacts.length,
+                      itemBuilder: (context, index) {
+                        final contact = controller.filteredContacts[index];
+                        return Column(
+                          children: [
+                            ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: utils.pinkLilac,
+                                child: Text(contact.name[0]),
+                              ),
+                              title: Text(
+                                contact.name,
+                                style: TextStyle(
+                                  color: utils.darkGrey,
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Divider(thickness: 1, color: utils.darkGrey),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
               ),
             ],
           ),
