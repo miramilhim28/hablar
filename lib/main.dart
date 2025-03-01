@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
+import 'package:hablar_clone/screens/home_screens/contacts_screen.dart';
+import 'package:hablar_clone/screens/home_screens/settings_screen.dart';
+import 'package:hablar_clone/screens/landing_screen.dart';
 import 'screens/auth_screens/login_screen.dart';
 
 

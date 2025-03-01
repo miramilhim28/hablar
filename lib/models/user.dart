@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'contact.dart';
 
-class User{
+class User {
   final String name;
   final String email;
   final String photoUrl;
@@ -8,7 +9,8 @@ class User{
   final String password;
   final String phone;
   final String uid;
-  final List<String> contacts;
+  final Map<String, dynamic> werbRtcInfo;
+  final List<Contact> contacts;
   final List<String> history;
   final List<String> favorites;
 
@@ -20,6 +22,7 @@ class User{
     required this.password,
     required this.phone,
     required this.uid,
+    required this.werbRtcInfo,
     required this.contacts,
     required this.history,
     required this.favorites,
@@ -33,13 +36,19 @@ class User{
     'password': password,
     'phone': phone,
     'uid': uid,
-    'contacts': contacts,
+    'werbRtcInfo': werbRtcInfo,
+    'contacts': contacts.map((contact) => contact.toJson()).toList(),
     'history': history,
     'favorites': favorites,
   };
 
-  static User fromSnap(DocumentSnapshot snap){
+  static User fromSnap(DocumentSnapshot snap) {
     var snapshot = snap.data() as Map<String, dynamic>;
+
+    List<Contact> contactList =
+        (snapshot['contacts'] as List)
+            .map((contactData) => Contact.fromJson(contactData))
+            .toList();
 
     return User(
       name: snapshot['name'],
@@ -49,10 +58,10 @@ class User{
       password: snapshot['password'],
       phone: snapshot['phone'],
       uid: snapshot['uid'],
-      contacts: snapshot['contacts'],
-      history: snapshot['history'],
-      favorites: snapshot['favorites'],
+      werbRtcInfo: snapshot['werbRtcInfo'] ?? {},
+      contacts: contactList,
+      history: List<String>.from(snapshot['history']),
+      favorites: List<String>.from(snapshot['favorites']),
     );
   }
-
 }

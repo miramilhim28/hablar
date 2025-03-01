@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/settings_controller.dart';
+import 'package:hablar_clone/screens/auth_screens/login_screen.dart';
 import 'package:hablar_clone/screens/home_screens/edit_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
@@ -112,7 +113,8 @@ class SettingsScreen extends StatelessWidget {
                   SizedBox(
                     width: 150,
                     child: ElevatedButton(
-                      onPressed: controller.signOut,
+                      onPressed: () =>
+                      Get.to(() => LoginScreen()),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: utils.darkPurple,
                         foregroundColor: utils.white,

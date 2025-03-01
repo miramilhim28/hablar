@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:confirm_dialog/confirm_dialog.dart';
 import 'package:hablar_clone/controllers/settings_controller.dart';
+import 'package:hablar_clone/screens/home_screens/settings_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class EditScreen extends StatelessWidget {
   final SettingsController controller = Get.put(SettingsController());
 
-   EditScreen({super.key});
+  EditScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,31 +27,29 @@ class EditScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.only(top: 40, bottom: 16), 
               child: Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment:
+                    MainAxisAlignment
+                        .spaceBetween,
                 children: [
                   IconButton(
                     icon: const Icon(
                       Icons.arrow_back_ios_new,
                       color: utils.darkPurple,
                     ),
-                    onPressed: () {
-                      Get.back();
-                    },
+                    onPressed: () => Get.to(() => SettingsScreen()),
                   ),
-                  Expanded(
-                    child: Text(
-                      'Settings',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.bold,
-                        color: utils.darkGrey,
-                      ),
+                  Text(
+                    'Edit Contact',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: utils.darkGrey,
                     ),
                   ),
+                  Container(width: 60),
                 ],
               ),
             ),
@@ -65,7 +64,9 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().nameController,
+                controller:
+                    controller.nameController
+                      ..text = controller.profile.value.name,
                 decoration: InputDecoration(
                   hintText: 'Edit Name',
                   filled: true,
@@ -84,7 +85,9 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().emailController,
+                controller:
+                    controller.emailController
+                      ..text = controller.profile.value.email,
                 decoration: InputDecoration(
                   hintText: 'Edit Email',
                   filled: true,
@@ -103,7 +106,9 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().phoneController,
+                controller:
+                    controller.phoneController
+                      ..text = controller.profile.value.phone,
                 decoration: InputDecoration(
                   hintText: 'Edit Phone Number',
                   filled: true,
@@ -122,7 +127,9 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().passwordController,
+                controller:
+                    controller.passwordController
+                      ..text = controller.profile.value.password,
                 decoration: InputDecoration(
                   hintText: 'Edit Password',
                   filled: true,
@@ -141,7 +148,9 @@ class EditScreen extends StatelessWidget {
               width: 300,
               height: 50,
               child: TextField(
-                controller: SettingsController().bioController,
+                controller:
+                    controller.bioController
+                      ..text = controller.profile.value.bio,
                 decoration: InputDecoration(
                   hintText: 'Edit Bio',
                   filled: true,
@@ -159,18 +168,19 @@ class EditScreen extends StatelessWidget {
             SizedBox(
               width: 150,
               child: ElevatedButton(
-                onPressed: () async {
-                  if (await confirm(
-                    context,
-                    title: const Text('Confirm', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, color: utils.darkPurple),),
-                    content:const Text('Your changes have been saved successfully!', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, color: utils.darkGrey),),
-                    textOK: const Text('Ok', style: TextStyle(fontFamily: 'Poppins', color: utils.darkPurple),),
-                    textCancel: const Text('Cancel', style: TextStyle(fontFamily: 'Poppins', color: utils.darkGrey),),
-                  )) {
-                  return log('Saved');
-                  }
-                  return log('Canceled');
-                },
+                onPressed:
+                    controller.isLoading.value
+                        ? null
+                        : () {
+                          controller.updateUserData(
+                            controller.nameController.text,
+                            controller.emailController.text,
+                            controller.passwordController.text,
+                            controller.phoneController.text,
+                            controller.bioController.text,
+                          );
+                          Get.off(() => SettingsScreen());
+                        },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: utils.pinkLilac,
                   foregroundColor: utils.white,

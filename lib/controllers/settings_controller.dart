@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hablar_clone/models/profile.dart';
+import 'package:hablar_clone/screens/auth_screens/login_screen.dart';
 
 class SettingsController extends GetxController {
   var selectedIndex = 4;
@@ -13,7 +14,7 @@ class SettingsController extends GetxController {
   var passwordController = TextEditingController();
   var profile = Profile(name: '', email: '', password: '', bio: '', phone: '').obs;
   var isPasswordVisible = false.obs;
-  var isLoading = true.obs;
+  var isLoading = false.obs;
 
   @override
   void onInit() {
@@ -39,6 +40,7 @@ class SettingsController extends GetxController {
         Get.snackbar('Error', 'No user profile found.');
       }
     }
+    Get.back();
   } catch (e) {
     Get.snackbar('Error', 'Failed to load user data: $e');
   } finally {
@@ -46,13 +48,37 @@ class SettingsController extends GetxController {
   }
 }
 
+  Future<void> updateUserData(String name, String email, String password, String phone, String bio) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null){
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'name': name,
+          'email': email,
+          'password': password,
+          'phone': phone,
+          'bio': bio,
+        });
+        profile.value = Profile(
+          name: name,
+          email: email,
+          password: password,
+          phone: phone,
+          bio: bio,
+        );
+      }
+    } catch (e){
+      Get.snackbar('Error', 'Failed to update profile: $e');
+    }
+  }
+
   void togglePasswordVisibility() {
     isPasswordVisible.value = !isPasswordVisible.value;
   }
 
   void signOut() async {
     await FirebaseAuth.instance.signOut();
-    Get.offAllNamed('/login');
+    Get.toNamed(LoginScreen() as String);
   }
 }
 
