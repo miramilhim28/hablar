@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/screens/home_screens/contacts_screen.dart';
+import 'package:hablar_clone/screens/home_screens/info_screen.dart';
 import 'package:hablar_clone/screens/home_screens/settings_screen.dart';
 import 'package:hablar_clone/screens/landing_screen.dart';
 import 'screens/auth_screens/login_screen.dart';
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
-      home: LoginScreen(),
+      home: LandingScreen(),
     );
   }
 }

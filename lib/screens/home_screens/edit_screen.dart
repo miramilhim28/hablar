@@ -38,7 +38,7 @@ class EditScreen extends StatelessWidget {
                       Icons.arrow_back_ios_new,
                       color: utils.darkPurple,
                     ),
-                    onPressed: () => Get.to(() => SettingsScreen()),
+                    onPressed: () => Get.back(),
                   ),
                   Text(
                     'Edit Contact',

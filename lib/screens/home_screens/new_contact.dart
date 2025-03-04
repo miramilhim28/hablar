@@ -112,7 +112,7 @@ class NewContactScreen extends StatelessWidget {
                             name: controller.nameController.text,
                             phone: controller.phoneController.text,
                           );
-                          Get.off(() => ContactScreen());
+                          Get.back();
                         },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: utils.darkPurple,

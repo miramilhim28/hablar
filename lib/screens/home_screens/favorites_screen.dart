@@ -81,7 +81,7 @@ class FavoritesScreen extends StatelessWidget {
                                 ),
                               ),
                               trailing: Icon(
-                                Icons.info,
+                                Icons.favorite,
                                 color: utils.darkPurple,
                               ),
                             ),

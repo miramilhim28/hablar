@@ -1,12 +1,13 @@
 import 'package:get/get.dart';
 import 'package:hablar_clone/models/contact.dart';
+import 'package:hablar_clone/models/favorite.dart';
 
 class FavoritesController extends GetxController{
   var search = ''.obs;
   var selectedIndex = 0;
-  var contacts = <Contact>[].obs;
+  var contacts = <Favorite>[].obs;
 
-  RxList<Contact> get filteredContacts =>
+  RxList<Favorite> get filteredContacts =>
       search.value.isEmpty
           ? contacts
           : contacts

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hablar_clone/screens/home_screens/info_screen.dart';
 import 'package:hablar_clone/controllers/contact_controller.dart';
 import 'package:hablar_clone/screens/home_screens/new_contact.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
@@ -63,23 +64,26 @@ class ContactScreen extends StatelessWidget {
                       return Column(
                         children: [
                           ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: utils.pinkLilac,
-                                child: Text(contact.name[0]),
-                              ),
-                              title: Text(
-                                contact.name,
-                                style: TextStyle(
-                                  color: utils.darkGrey,
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              trailing: Icon(
-                                Icons.favorite_border_rounded,
-                                color: utils.darkPurple,
+                            leading: CircleAvatar(
+                              backgroundColor: utils.pinkLilac,
+                              child: Text(contact.name[0]),
+                            ),
+                            title: Text(
+                              contact.name,
+                              style: TextStyle(
+                                color: utils.darkGrey,
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
+                            trailing: Icon(
+                              Icons.favorite_border_rounded,
+                              color: utils.darkPurple,
+                            ),
+                            onTap: () {
+                              Get.to(() => InfoScreen(), arguments: contact);
+                            },
+                          ),
                           Divider(thickness: 1, color: utils.darkGrey),
                         ],
                       );
