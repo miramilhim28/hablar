@@ -57,38 +57,59 @@ class ContactScreen extends StatelessWidget {
               SizedBox(height: 16),
               Expanded(
                 child: Obx(
-                  () => ListView.builder(
-                    itemCount: controller.filteredContacts.length,
-                    itemBuilder: (context, index) {
-                      final contact = controller.filteredContacts[index];
-                      return Column(
-                        children: [
-                          ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: utils.pinkLilac,
-                              child: Text(contact.name[0]),
+                  () =>
+                      controller.isLoading.value
+                          ? Center(
+                            child: CircularProgressIndicator(
+                              color: utils.darkPurple,
                             ),
-                            title: Text(
-                              contact.name,
+                          )
+                          : controller.filteredContacts.isEmpty
+                          ? Center(
+                            child: Text(
+                              'No contacts found',
                               style: TextStyle(
                                 color: utils.darkGrey,
                                 fontFamily: 'Poppins',
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            trailing: Icon(
-                              Icons.favorite_border_rounded,
-                              color: utils.darkPurple,
-                            ),
-                            onTap: () {
-                              Get.to(() => InfoScreen(), arguments: contact);
+                          )
+                          : ListView.builder(
+                            itemCount: controller.filteredContacts.length,
+                            itemBuilder: (context, index) {
+                              final contact =
+                                  controller.filteredContacts[index];
+                              return Column(
+                                children: [
+                                  ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: utils.pinkLilac,
+                                      child: Text(contact.name[0]),
+                                    ),
+                                    title: Text(
+                                      contact.name,
+                                      style: TextStyle(
+                                        color: utils.darkGrey,
+                                        fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    trailing: Icon(
+                                      Icons.favorite_border_rounded,
+                                      color: utils.darkPurple,
+                                    ),
+                                    onTap: () {
+                                      Get.to(
+                                        () => InfoScreen(),
+                                        arguments: contact,
+                                      );
+                                    },
+                                  ),
+                                  Divider(thickness: 1, color: utils.darkGrey),
+                                ],
+                              );
                             },
                           ),
-                          Divider(thickness: 1, color: utils.darkGrey),
-                        ],
-                      );
-                    },
-                  ),
                 ),
               ),
             ],

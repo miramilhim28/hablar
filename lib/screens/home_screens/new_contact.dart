@@ -20,14 +20,14 @@ class NewContactScreen extends StatelessWidget {
             colors: [utils.purpleLilac, utils.white],
           ),
         ),
-        
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 40, bottom: 16), 
+              padding: const EdgeInsets.only(top: 40, bottom: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
                     onPressed: () => Get.to(() => ContactScreen()),
@@ -50,15 +50,15 @@ class NewContactScreen extends StatelessWidget {
                       color: utils.darkGrey,
                     ),
                   ),
-                  
-                  Container(width: 60), 
+
+                  Container(width: 60),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
             Icon(Icons.person, color: utils.darkPurple, size: 100),
-            
+
             const SizedBox(height: 24),
 
             //name:

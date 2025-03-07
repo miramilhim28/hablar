@@ -19,20 +19,13 @@ class ContactsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      //fetch contacts for the logged in user
-      getContacts(currentUser.uid);
-    }
+    getContacts(); // Fetch all users except the current user
   }
 
-  //add Contact to Firestore
-  Future<void> addContact({required String name, required String phone}) async {
-    if (name.isEmpty || phone.isEmpty) return;
-
+  // Fetch all users from Firestore (excluding the current user)
+  Future<void> getContacts() async {
     isLoading.value = true;
     try {
-      //get the current user's ID
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
         Get.snackbar(
@@ -44,27 +37,21 @@ class ContactsController extends GetxController {
         return;
       }
 
-      //create the contact object
-      model.Contact contact = model.Contact(id: '', name: name, phone: phone);
+      // Fetch all users from Firestore
+      var snapshot = await _firestore.collection('users').get();
 
-      //fetch the user document
-      DocumentReference userRef = _firestore
-          .collection('users')
-          .doc(currentUser.uid);
+      contacts.value =
+          snapshot.docs
+              .map((doc) => model.Contact.fromJson(doc.data()))
+              .where(
+                (contact) =>
+                    contact.email != null &&
+                    contact.email!.isNotEmpty &&
+                    contact.id != currentUser.uid,
+              ) // Exclude current user
+              .toList();
 
-      //add the contact to the user's contacts list
-      await userRef.update({
-        'contacts': FieldValue.arrayUnion([
-          contact.toJson(),
-        ]),
-      });
-
-      //clear input fields
-      nameController.clear();
-      phoneController.clear();
-
-      //fetch updated contacts for the user
-      getContacts(currentUser.uid); 
+      filterContacts(); // Apply search filter
     } catch (err) {
       Get.snackbar(
         "Error",
@@ -77,36 +64,77 @@ class ContactsController extends GetxController {
     }
   }
 
-  //fetch Contacts from Firestore
-  Future<void> getContacts(String uid) async {
-    isLoading.value = true;
-    try {
-      //fetch the user's document from Firestore using the UID
-      var snapshot = await _firestore.collection('users').doc(uid).get();
+  // Add a new contact to Firestore and update the current user's contact list
+  Future<void> addContact({required String name, required String phone}) async {
+    if (name.isEmpty || phone.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Please enter both name and phone number",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
 
-      //check if the document exists
-      if (!snapshot.exists) {
+    isLoading.value = true;
+
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
         Get.snackbar(
           "Error",
-          "User document not found",
+          "No user is logged in",
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
         return;
       }
 
-      //extract the contacts array from the user's document
-      var userData = snapshot.data();
-      List<dynamic> contactList = userData?['contacts'] ?? [];
+      // Create a new contact object
+      model.Contact newContact = model.Contact(
+        id: DateTime.now().millisecondsSinceEpoch.toString(), // Using timestamp for a unique ID
+        name: name,
+        phone: phone,
+        email: "", // Email is optional
+      );
 
-      //convert the contacts data into model.Contact objects
-      contacts.value =
-          contactList
-              .map((contactData) => model.Contact.fromJson(contactData))
-              .toList();
+      // Fetch the current user's document from Firestore
+      var userRef = _firestore.collection('users').doc(currentUser.uid);
 
-      //apply search filter after fetching contacts
+      // Fetch the current user to get their contacts list
+      var userSnapshot = await userRef.get();
+      if (!userSnapshot.exists) {
+        Get.snackbar(
+          "Error",
+          "User not found",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Get the current contacts from Firestore
+      List<dynamic> currentContacts = userSnapshot.data()?['contacts'] ?? [];
+
+      // Add the new contact to the user's contacts list
+      currentContacts.add(newContact.toJson());
+
+      // Update the user's contacts in Firestore
+      await userRef.update({
+        'contacts': currentContacts,
+      });
+
+      // Add the new contact to the local contacts list and refresh the display
+      contacts.add(newContact);
       filterContacts();
+
+      Get.back(); // Close the screen after adding
+      Get.snackbar(
+        "Success",
+        "Contact added successfully!",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (err) {
       Get.snackbar(
         "Error",
@@ -119,7 +147,7 @@ class ContactsController extends GetxController {
     }
   }
 
-  //filter Contacts Based on Search Input
+  // Filter Contacts Based on Search Input
   void filterContacts() {
     filteredContacts.value =
         contacts
@@ -140,3 +168,9 @@ class ContactsController extends GetxController {
     selectedIndex = index;
   }
 }
+
+
+
+
+
+

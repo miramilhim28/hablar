@@ -19,4 +19,9 @@ class InfoController extends GetxController {
   void updateSelectedIndex(int index){
     selectedIndex = index;
   }
+
+  @override
+  void onClose(){
+    super.onClose();
+  }
 }

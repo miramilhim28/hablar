@@ -1,8 +1,17 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:get/get.dart';
 
-class WebRTCSignaling {
+class CallSignallingController extends GetxController {
   RTCPeerConnection? _peerConnection;
-  List<RTCIceCandidate> _iceCandidates = [];
+  var iceCandidates = <RTCIceCandidate>[].obs;
+  var isCallActive = false.obs;
+  var remoteSDP = ''.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initializePeerConnection();
+  }
 
   Future<void> _initializePeerConnection() async {
     _peerConnection = await createPeerConnection({
@@ -14,34 +23,32 @@ class WebRTCSignaling {
 
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       if (candidate.candidate != null) {
-        _iceCandidates.add(candidate);
+        iceCandidates.add(candidate);
       }
     };
   }
 
-  /// Create Offer SDP
+  /// Create an Offer SDP for initiating a call
   Future<Map<String, dynamic>> createOffer() async {
     await _initializePeerConnection();
-
+    isCallActive.value = true;
     RTCSessionDescription offer = await _peerConnection!.createOffer();
     await _peerConnection!.setLocalDescription(offer);
 
     return {
       'offerSDP': offer.sdp,
-      'iceCandidates': _iceCandidates.map((c) => c.toMap()).toList(),
+      'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
     };
   }
 
-  /// Create Answer SDP and collect ICE candidates
+  /// Create an Answer SDP to accept a call
   Future<Map<String, dynamic>> createAnswer(String offerSDP, List<dynamic> remoteIceCandidates) async {
     await _initializePeerConnection();
-
-    // Set remote offer SDP
+    remoteSDP.value = offerSDP;
     await _peerConnection!.setRemoteDescription(
       RTCSessionDescription(offerSDP, 'offer'),
     );
 
-    // Add remote ICE candidates
     for (var candidate in remoteIceCandidates) {
       _peerConnection!.addCandidate(RTCIceCandidate(
         candidate['candidate'],
@@ -50,18 +57,22 @@ class WebRTCSignaling {
       ));
     }
 
-    // Generate answer SDP
     RTCSessionDescription answer = await _peerConnection!.createAnswer();
     await _peerConnection!.setLocalDescription(answer);
 
     return {
       'answerSDP': answer.sdp,
-      'iceCandidates': _iceCandidates.map((c) => c.toMap()).toList(),
+      'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
     };
   }
+
+  /// End the call
+  void endCall() {
+    _peerConnection?.close();
+    _peerConnection = null;
+    isCallActive.value = false;
+    iceCandidates.clear();
+    remoteSDP.value = '';
+  }
 }
-
-
-
-
 

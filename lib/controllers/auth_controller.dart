@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/models/user.dart' as model;
 import 'package:hablar_clone/screens/landing_screen.dart';
-import 'package:hablar_clone/webRTC/signaling.dart';
+import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -59,10 +59,8 @@ class AuthController extends GetxController {
         password: passwordController.text,
       );
 
-      WebRTCSignaling signaling = WebRTCSignaling();
-      Map<String, dynamic> webrtcData = await signaling.createOffer();
-
-      
+      CallSignallingController signalling = CallSignallingController();
+      Map<String, dynamic> webrtcData = await signalling.createOffer();
 
       model.User user = model.User(
         name: nameController.text,
@@ -117,10 +115,11 @@ class AuthController extends GetxController {
     isLoading.value = true;
     try {
       // Check if user exists before logging in
-      QuerySnapshot querySnapshot = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: emailController.text)
-          .get();
+      QuerySnapshot querySnapshot =
+          await _firestore
+              .collection('users')
+              .where('email', isEqualTo: emailController.text)
+              .get();
 
       if (querySnapshot.docs.isEmpty) {
         Get.snackbar(
@@ -138,16 +137,28 @@ class AuthController extends GetxController {
       );
 
       // Retrieve WebRTC data from Firestore
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(userCredential.user!.uid).get();
+      DocumentSnapshot userDoc =
+          await _firestore
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .get();
       Map<String, dynamic>? webrtcData = userDoc['werbRtcInfo'];
 
-      Get.snackbar('Success', 'Logged in successfully!', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Success',
+        'Logged in successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       nameController.clear();
       emailController.clear();
       passwordController.clear();
       Get.to(LandingScreen());
     } catch (err) {
-      Get.snackbar('Error', err.toString(), snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Error',
+        err.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } finally {
       isLoading.value = false;
     }

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/info_controller.dart';
+import 'package:hablar_clone/screens/home_screens/join_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class InfoScreen extends StatelessWidget {
   final InfoController controller = Get.put(InfoController());
   final contact = Get.arguments;
+  InfoScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +29,12 @@ class InfoScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
-                  spacing: 50,
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: utils.darkGrey),
                       onPressed: () => Get.back(),
                     ),
+                    SizedBox(width: 60),
                     Text(
                       'Contact Details',
                       style: TextStyle(
@@ -80,9 +82,50 @@ class InfoScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    iconButton(Icons.call, 'Call', () {}),
-                    iconButton(Icons.videocam, 'Video', () {}),
-                    iconButton(Icons.message, 'Message', () {}),
+                    GestureDetector(
+                      onTap: () {
+                        Get.to(() => JoinScreen(selfCallerId: controller.name.value));
+                      },
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 25,
+                            backgroundColor: utils.pinkLilac,
+                            child: Icon(Icons.call, color: utils.darkPurple),
+                          ),
+                          SizedBox(height: 5),
+                          Text('Call', style: TextStyle(color: utils.darkGrey)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {},
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 25,
+                            backgroundColor: utils.pinkLilac,
+                            child: Icon(Icons.videocam, color: utils.darkPurple),
+                          ),
+                          SizedBox(height: 5),
+                          Text('Video', style: TextStyle(color: utils.darkGrey)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {},
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 25,
+                            backgroundColor: utils.pinkLilac,
+                            child: Icon(Icons.message, color: utils.darkPurple),
+                          ),
+                          SizedBox(height: 5),
+                          Text('Message', style: TextStyle(color: utils.darkGrey)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -103,23 +146,6 @@ class InfoScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget iconButton(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: utils.pinkLilac,
-            child: Icon(icon, color: utils.darkPurple),
-          ),
-          SizedBox(height: 5),
-          Text(label, style: TextStyle(color: utils.darkGrey)),
-        ],
       ),
     );
   }
@@ -177,3 +203,4 @@ class InfoScreen extends StatelessWidget {
     );
   }
 }
+
