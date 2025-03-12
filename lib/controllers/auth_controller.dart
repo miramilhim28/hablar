@@ -59,8 +59,8 @@ class AuthController extends GetxController {
         password: passwordController.text,
       );
 
-      CallSignallingController signalling = CallSignallingController();
-      Map<String, dynamic> webrtcData = await signalling.createOffer();
+      // ✅ Initialize WebRTC info as empty
+      Map<String, dynamic> werbRtcInfo = {'offerSDP': '', 'iceCandidates': []};
 
       model.User user = model.User(
         name: nameController.text,
@@ -70,12 +70,13 @@ class AuthController extends GetxController {
         phone: '',
         uid: cred.user!.uid,
         bio: '',
-        werbRtcInfo: webrtcData,
+        werbRtcInfo: werbRtcInfo,
         history: [],
         favorites: [],
         contacts: [],
       );
 
+      // Save to Firestore
       await _firestore
           .collection('users')
           .doc(cred.user!.uid)

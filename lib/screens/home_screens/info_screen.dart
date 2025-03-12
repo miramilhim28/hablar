@@ -1,17 +1,25 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/info_controller.dart';
+import 'package:hablar_clone/controllers/contact_controller.dart';
+import 'package:hablar_clone/models/contact.dart' as model;
+import 'package:hablar_clone/screens/home_screens/contacts_screen.dart';
 import 'package:hablar_clone/screens/home_screens/join_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class InfoScreen extends StatelessWidget {
   final InfoController controller = Get.put(InfoController());
+  final ContactsController contactsController = Get.find<ContactsController>();
   final contact = Get.arguments;
+
   InfoScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    controller.phone.value = contact.phone;
+    // Fetch contact details from the ContactsController when the screen is initialized
+    _fetchContactDetails();
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -84,7 +92,15 @@ class InfoScreen extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(() => JoinScreen(selfCallerId: controller.name.value));
+                        // Fetch the current user's ID
+                        String currentUserId =
+                            FirebaseAuth.instance.currentUser?.uid ?? '';
+                        Get.to(
+                          () => JoinScreen(
+                            callerId: currentUserId,
+                            calleeId: contact.id,
+                          ),
+                        );
                       },
                       child: Column(
                         children: [
@@ -105,10 +121,16 @@ class InfoScreen extends StatelessWidget {
                           CircleAvatar(
                             radius: 25,
                             backgroundColor: utils.pinkLilac,
-                            child: Icon(Icons.videocam, color: utils.darkPurple),
+                            child: Icon(
+                              Icons.videocam,
+                              color: utils.darkPurple,
+                            ),
                           ),
                           SizedBox(height: 5),
-                          Text('Video', style: TextStyle(color: utils.darkGrey)),
+                          Text(
+                            'Video',
+                            style: TextStyle(color: utils.darkGrey),
+                          ),
                         ],
                       ),
                     ),
@@ -122,7 +144,10 @@ class InfoScreen extends StatelessWidget {
                             child: Icon(Icons.message, color: utils.darkPurple),
                           ),
                           SizedBox(height: 5),
-                          Text('Message', style: TextStyle(color: utils.darkGrey)),
+                          Text(
+                            'Message',
+                            style: TextStyle(color: utils.darkGrey),
+                          ),
                         ],
                       ),
                     ),
@@ -138,7 +163,10 @@ class InfoScreen extends StatelessWidget {
                     Obx(() => infoTile('Bio', controller.bio.value)),
                     Obx(() => infoTile('Email', controller.email.value)),
                     SizedBox(height: 20),
-                    actionButton('Delete Contact', utils.pinkLilac, () {}),
+                    actionButton('Delete Contact', utils.pinkLilac, () {
+                      // Show confirmation dialog for deleting contact
+                      _showDeleteDialog(context);
+                    }),
                     actionButton('Block Caller', Colors.red.shade800, () {}),
                   ],
                 ),
@@ -148,6 +176,82 @@ class InfoScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Fetch contact details from ContactsController
+  void _fetchContactDetails() {
+    var contactDetails = contactsController.contacts.firstWhere(
+      (contact) => contact.id == this.contact.id,
+      orElse:
+          () => model.Contact(id: '', name: '', phone: '', email: '', bio: ''),
+    );
+
+    controller.setContactDetails(
+      contactDetails.name,
+      contactDetails.phone,
+      contactDetails.bio,
+      contactDetails.email,
+    );
+  }
+
+  // Show confirmation dialog to delete contact
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Are you sure you want to delete the contact?",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 20,
+              color: utils.darkGrey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Call deleteContact in ContactsController
+                _deleteContact();
+                Navigator.of(context).pop(); // Close the dialog
+                Get.offAll(
+                  () => ContactScreen(),
+                ); // Navigate back to ContactScreen
+              },
+              child: Text(
+                "Yes",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  color: utils.darkPurple,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                // Close the dialog and stay on the current screen
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                "No",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  color: utils.darkPurple,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Delete contact
+  void _deleteContact() {
+    contactsController.deleteContact(contact.id); // Delete from controller
+    Get.back();
   }
 
   Widget infoTile(String title, String value) {
@@ -203,4 +307,3 @@ class InfoScreen extends StatelessWidget {
     );
   }
 }
-

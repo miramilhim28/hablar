@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/screens/home_screens/info_screen.dart';
 import 'package:hablar_clone/controllers/contact_controller.dart';
+import 'package:hablar_clone/controllers/favorites_controller.dart';
+import 'package:hablar_clone/models/favorite.dart';
 import 'package:hablar_clone/screens/home_screens/new_contact.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class ContactScreen extends StatelessWidget {
   final ContactsController controller = Get.put(ContactsController());
+  final FavoritesController favoritesController = Get.put(
+    FavoritesController(),
+  );
 
   ContactScreen({super.key});
 
@@ -79,9 +84,16 @@ class ContactScreen extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final contact =
                                   controller.filteredContacts[index];
+                              bool isFav = favoritesController.isFavorite(
+                                contact.id,
+                              );
+
                               return Column(
                                 children: [
                                   ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
                                     leading: CircleAvatar(
                                       backgroundColor: utils.pinkLilac,
                                       child: Text(contact.name[0]),
@@ -94,9 +106,22 @@ class ContactScreen extends StatelessWidget {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    trailing: Icon(
-                                      Icons.favorite_border_rounded,
-                                      color: utils.darkPurple,
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        isFav
+                                            ? Icons.favorite
+                                            : Icons.favorite_border_rounded,
+                                        color: utils.darkPurple,
+                                      ),
+                                      onPressed: () {
+                                        favoritesController.toggleFavorite(
+                                          Favorite(
+                                            id: contact.id,
+                                            name: contact.name,
+                                            phone: contact.phone,
+                                          ),
+                                        );
+                                      },
                                     ),
                                     onTap: () {
                                       Get.to(

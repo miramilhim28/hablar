@@ -1,11 +1,15 @@
 class Favorite {
-  final id;
+  final String id;
   final String name;
   final String phone;
 
-  const Favorite({required this.id, required this.name, required this.phone});
+  Favorite({required this.id, required this.name, required this.phone});
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'phone': phone};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+      };
 
   factory Favorite.fromJson(Map<String, dynamic> json) {
     return Favorite(

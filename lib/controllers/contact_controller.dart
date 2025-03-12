@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hablar_clone/controllers/favorites_controller.dart';
 import 'package:hablar_clone/models/contact.dart' as model;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hablar_clone/models/favorite.dart';
 
 class ContactsController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -37,21 +39,44 @@ class ContactsController extends GetxController {
         return;
       }
 
-      // Fetch all users from Firestore
-      var snapshot = await _firestore.collection('users').get();
+      print("Current User UID: ${currentUser.uid}");
 
-      contacts.value =
-          snapshot.docs
-              .map((doc) => model.Contact.fromJson(doc.data()))
-              .where(
-                (contact) =>
-                    contact.email != null &&
-                    contact.email!.isNotEmpty &&
-                    contact.id != currentUser.uid,
-              ) // Exclude current user
-              .toList();
+      // Fetch all users except the current user
+      var snapshot =
+          await _firestore
+              .collection('users')
+              .where('uid', isNotEqualTo: currentUser.uid)
+              .orderBy('uid')
+              .get();
 
+      print("Fetched ${snapshot.docs.length} user documents");
+
+      // Convert Firestore data to Contact objects
+      List<model.Contact> fetchedContacts =
+          snapshot.docs.map((doc) {
+            var data = doc.data();
+            return model.Contact(
+              id: doc.id, // Store Firestore document ID as the contact's ID
+              name: data['name'] ?? '',
+              phone: data['phone'] ?? '',
+              email: data['email'] ?? '',
+              bio: data['bio'] ?? '',
+            );
+          }).toList();
+
+      // Update local contacts list
+      contacts.value = fetchedContacts;
       filterContacts(); // Apply search filter
+
+      // Convert contacts to JSON format for Firestore storage
+      List<Map<String, dynamic>> contactJsonList =
+          fetchedContacts.map((contact) => contact.toJson()).toList();
+
+      // Update Firestore with new contacts list under the current user's document
+      var userRef = _firestore.collection('users').doc(currentUser.uid);
+      await userRef.update({'contacts': contactJsonList});
+
+      print("Contacts updated in Firestore!");
     } catch (err) {
       Get.snackbar(
         "Error",
@@ -77,7 +102,6 @@ class ContactsController extends GetxController {
     }
 
     isLoading.value = true;
-
     try {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -90,18 +114,17 @@ class ContactsController extends GetxController {
         return;
       }
 
-      // Create a new contact object
+      // Create a new contact object with a unique ID.
       model.Contact newContact = model.Contact(
-        id: DateTime.now().millisecondsSinceEpoch.toString(), // Using timestamp for a unique ID
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: name,
         phone: phone,
-        email: "", // Email is optional
+        email: "",
+        bio: "",
       );
 
       // Fetch the current user's document from Firestore
       var userRef = _firestore.collection('users').doc(currentUser.uid);
-
-      // Fetch the current user to get their contacts list
       var userSnapshot = await userRef.get();
       if (!userSnapshot.exists) {
         Get.snackbar(
@@ -113,18 +136,16 @@ class ContactsController extends GetxController {
         return;
       }
 
-      // Get the current contacts from Firestore
+      // Get the current contacts from Firestore (if any)
       List<dynamic> currentContacts = userSnapshot.data()?['contacts'] ?? [];
 
-      // Add the new contact to the user's contacts list
+      // Add the new contact to the contacts list
       currentContacts.add(newContact.toJson());
 
-      // Update the user's contacts in Firestore
-      await userRef.update({
-        'contacts': currentContacts,
-      });
+      // Update the user's document with the new contacts list
+      await userRef.update({'contacts': currentContacts});
 
-      // Add the new contact to the local contacts list and refresh the display
+      // Update local list
       contacts.add(newContact);
       filterContacts();
 
@@ -167,10 +188,100 @@ class ContactsController extends GetxController {
   void updateSelectedIndex(int index) {
     selectedIndex = index;
   }
+
+  void toggleFavorite(model.Contact contact) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    var userRef = _firestore.collection('users').doc(currentUser.uid);
+    var favoritesController = Get.find<FavoritesController>();
+
+    try {
+      bool isFavorite = favoritesController.favorites.any(
+        (c) => c.id == contact.id,
+      );
+
+      if (isFavorite) {
+        // Remove from favorites
+        favoritesController.favorites.removeWhere((c) => c.id == contact.id);
+      } else {
+        // Add to favorites
+        Favorite newFavorite = Favorite(
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone,
+        );
+        favoritesController.favorites.add(newFavorite);
+      }
+
+      // Update Firestore
+      await userRef.update({
+        'favorites':
+            favoritesController.favorites.map((c) => c.toJson()).toList(),
+      });
+
+      favoritesController.favorites.refresh(); // Update UI
+    } catch (e) {
+      print("Error updating favorite status: $e");
+    }
+  }
+
+  // Delete Contact
+  Future<void> deleteContact(String contactId) async {
+    isLoading.value = true;
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        Get.snackbar(
+          "Error",
+          "No user is logged in",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Fetch the current user's document
+      var userRef = _firestore.collection('users').doc(currentUser.uid);
+      var userSnapshot = await userRef.get();
+      if (!userSnapshot.exists) {
+        Get.snackbar(
+          "Error",
+          "User not found",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Get the current contacts from Firestore (if any)
+      List<dynamic> currentContacts = userSnapshot.data()?['contacts'] ?? [];
+
+      // Remove the contact from the list
+      currentContacts.removeWhere((contact) => contact['id'] == contactId);
+
+      // Update Firestore with the new contacts list
+      await userRef.update({'contacts': currentContacts});
+
+      // Remove the contact from the local list
+      contacts.removeWhere((contact) => contact.id == contactId);
+      contacts.refresh(); // Refresh the contacts list to notify the UI
+
+      Get.snackbar(
+        "Success",
+        "Contact deleted successfully!",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (err) {
+      Get.snackbar(
+        "Error",
+        err.toString(),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
 }
-
-
-
-
-
-

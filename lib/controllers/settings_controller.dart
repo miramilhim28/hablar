@@ -80,5 +80,14 @@ class SettingsController extends GetxController {
     await FirebaseAuth.instance.signOut();
     Get.toNamed(LoginScreen() as String);
   }
+  @override
+  void onClose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    phoneController.dispose();
+    bioController.dispose();
+    super.onClose();
+  }
 }
 

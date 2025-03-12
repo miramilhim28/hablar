@@ -2,16 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
-import 'package:hablar_clone/screens/home_screens/call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/audio_call_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class JoinScreen extends StatelessWidget {
-  final String selfCallerId;
+class JoinScreen extends StatefulWidget {
+  final String callerId;
+  final String calleeId;
+
+  JoinScreen({super.key, required this.callerId, required this.calleeId});
+
+  @override
+  _JoinScreenState createState() => _JoinScreenState();
+}
+
+class _JoinScreenState extends State<JoinScreen> {
   final CallSignallingController callController = Get.put(
     CallSignallingController(),
   );
-  JoinScreen({super.key, required this.selfCallerId});
-  final TextEditingController remoteCallerIdController =
-      TextEditingController();
+  final TextEditingController callerIdController = TextEditingController();
+  final TextEditingController calleeIdController = TextEditingController();
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    callerIdController.text = widget.callerId;
+    calleeIdController.text = widget.calleeId;
+  }
 
   void _joinCall({
     required String callerId,
@@ -19,8 +36,44 @@ class JoinScreen extends StatelessWidget {
     dynamic offer,
   }) {
     Get.to(
-      () => CallScreen(callerId: callerId, calleeId: calleeId, offer: offer),
+      () =>
+          AudioCallScreen(callerId: callerId, calleeId: calleeId, offer: offer),
     );
+  }
+
+  Future<void> _startCall() async {
+    String callerId = callerIdController.text.trim();
+    String calleeId = calleeIdController.text.trim();
+
+    if (callerId.isEmpty || calleeId.isEmpty) {
+      Get.snackbar("Error", "Please enter both Caller ID and Callee ID.");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      var offer = await callController.createOffer(
+        myUserId: callerId,
+        remoteUserId: calleeId,
+      );
+      _joinCall(callerId: callerId, calleeId: calleeId, offer: offer);
+    } catch (e) {
+      Get.snackbar("Error", "Failed to create offer: $e");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    callerIdController.dispose();
+    calleeIdController.dispose();
+    super.dispose();
   }
 
   @override
@@ -66,9 +119,8 @@ class JoinScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Self Caller ID
                         TextField(
-                          controller: TextEditingController(text: selfCallerId),
+                          controller: callerIdController,
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Poppins'),
                           decoration: InputDecoration(
@@ -83,13 +135,12 @@ class JoinScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Remote Caller ID
                         TextField(
-                          controller: remoteCallerIdController,
+                          controller: calleeIdController,
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Poppins'),
                           decoration: InputDecoration(
-                            hintText: "Enter Remote Caller ID",
+                            hintText: "Enter the Callee ID",
                             hintStyle: TextStyle(fontFamily: 'Poppins'),
                             filled: true,
                             fillColor: utils.lightGrey,
@@ -100,7 +151,6 @@ class JoinScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 24),
-
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: utils.darkPurple,
@@ -110,67 +160,21 @@ class JoinScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(50),
                             ),
                           ),
-                          onPressed: () {
-                            _joinCall(
-                              callerId: selfCallerId,
-                              calleeId: remoteCallerIdController.text,
-                            );
-                          },
-                          child: Text(
-                            "Start Call",
-                            style: TextStyle(fontSize: 16, fontFamily: 'Poppins'),
-                          ),
+                          onPressed: isLoading ? null : _startCall,
+                          child:
+                              isLoading
+                                  ? CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                  : Text(
+                                    "Start Call",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
                         ),
                         const SizedBox(height: 20),
-                        // Incoming Call Alert
-                        Obx(() {
-                          if (callController.remoteSDP.value.isNotEmpty) {
-                            return Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              color: utils.lightGrey,
-                              child: ListTile(
-                                title: Text(
-                                  "Incoming Call from ${callController.remoteSDP.value}",
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    color: utils.darkGrey,
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Reject Call Button
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.call_end,
-                                        color: Colors.red,
-                                      ),
-                                      onPressed: () => callController.endCall(),
-                                    ),
-                                    // Accept Call Button
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.call,
-                                        color: Colors.green,
-                                      ),
-                                      onPressed: () {
-                                        _joinCall(
-                                          callerId: callController.remoteSDP.value,
-                                          calleeId: selfCallerId,
-                                          offer: callController.remoteSDP.value,
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }
-                          return const SizedBox();
-                        }),
                       ],
                     ),
                   ),
