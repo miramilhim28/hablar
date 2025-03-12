@@ -21,7 +21,7 @@ class InfoController extends GetxController {
   Future<void> fetchContactDetails(String contactId) async {
     try {
       DocumentSnapshot contactSnapshot = await FirebaseFirestore.instance
-          .collection('contacts') // Your Firestore collection
+          .collection('contacts')
           .doc(contactId)
           .get();
 

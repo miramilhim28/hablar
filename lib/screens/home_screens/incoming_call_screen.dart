@@ -20,42 +20,46 @@ class IncomingCallScreen extends StatelessWidget {
 
   final CallSignallingController controller = Get.find<CallSignallingController>();
 
+  // Accept the incoming call
   Future<void> _acceptCall() async {
-  try {
-    // Fetch the call details from Firestore
-    DocumentSnapshot callSnapshot = await FirebaseFirestore.instance.collection('users').doc(calleeId).get();
+    try {
+      // Fetch the call details from Firestore
+      DocumentSnapshot callSnapshot = await FirebaseFirestore.instance.collection('users').doc(calleeId).get();
 
-    if (!callSnapshot.exists) {
-      Get.snackbar("Error", "Call not found or already ended.");
-      return;
+      if (!callSnapshot.exists) {
+        Get.snackbar("Error", "Call not found or already ended.");
+        return;
+      }
+
+      Map<String, dynamic>? callData = callSnapshot.data() as Map<String, dynamic>?;
+
+      if (callData == null || !callData.containsKey('werbRtcInfo') || !callData['werbRtcInfo'].containsKey('offerSDP')) {
+        Get.snackbar("Error", "Invalid call data.");
+        return;
+      }
+
+      // Accept the call by passing offer SDP and ICE candidates
+      await controller.createAnswer(
+        callData['werbRtcInfo']['offerSDP'],
+        callData['werbRtcInfo']['iceCandidates'],
+      );
+
+      // Navigate to the audio call screen with the retrieved offer
+      Get.off(() => AudioCallScreen(
+        callerId: callerId,
+        calleeId: calleeId,
+        offer: callData['werbRtcInfo']['offerSDP'],
+      ));
+    } catch (e) {
+      Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
     }
-
-    Map<String, dynamic>? callData = callSnapshot.data() as Map<String, dynamic>?;
-
-    if (callData == null || !callData.containsKey('werbRtcInfo') || !callData['werbRtcInfo'].containsKey('offerSDP')) {
-      Get.snackbar("Error", "Invalid call data.");
-      return;
-    }
-
-    // Accept the call
-    await controller.answerCall(calleeId);
-
-    // Navigate to the audio call screen with the retrieved offer
-    Get.off(() => AudioCallScreen(
-      callerId: callerId,
-      calleeId: calleeId,
-      offer: callData['werbRtcInfo']['offerSDP'], // Pass the WebRTC offer
-    ));
-  } catch (e) {
-    Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
   }
-}
 
-
+  // Decline the incoming call
   Future<void> _declineCall() async {
     try {
       controller.endCall();
-      Get.back(); // Close the incoming call screen
+      Get.back();
     } catch (e) {
       Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
     }
@@ -86,11 +90,13 @@ class IncomingCallScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Accept Call Button
                 IconButton(
                   icon: const Icon(Icons.call, color: Colors.green, size: 50),
                   onPressed: _acceptCall,
                 ),
                 const SizedBox(width: 50),
+                // Decline Call Button
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
                   onPressed: _declineCall,

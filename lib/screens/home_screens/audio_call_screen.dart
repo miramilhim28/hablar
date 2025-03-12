@@ -35,15 +35,21 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
   }
 
   Future<void> _initializeAudioCall() async {
-    try {
-      _localStream = await webrtc.navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
-      if (widget.offer != null) {
-        await _callController.answerCall(widget.offer["offerSDP"]);
+  try {
+    _localStream = await webrtc.navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+    
+    if (widget.offer != null) {
+      String offerSDP = widget.offer['offerSDP'];
+      
+      if (offerSDP.isNotEmpty) {
+        await _callController.createAnswer(offerSDP, widget.offer['offerSDP']);
       }
-    } catch (e) {
-      print("Error initializing audio call: $e");
     }
+  } catch (e) {
+    print("Error initializing audio call: $e");
   }
+}
+
 
   void _startCallTimer() {
     Duration duration = Duration();

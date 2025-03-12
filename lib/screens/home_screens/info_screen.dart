@@ -250,7 +250,7 @@ class InfoScreen extends StatelessWidget {
 
   // Delete contact
   void _deleteContact() {
-    contactsController.deleteContact(contact.id); // Delete from controller
+    contactsController.deleteContact(contact.id); 
     Get.back();
   }
 

@@ -5,9 +5,19 @@ import 'package:hablar_clone/models/user.dart';
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Get user document reference
+  // Sanitize the user ID to ensure it does not contain invalid characters
+  String sanitizeUserId(String userId) {
+    // Ensure the userId doesn't contain slashes or invalid characters
+    if (userId.contains('/')) {
+      throw Exception('User ID cannot contain slashes');
+    }
+    return userId;
+  }
+
+  // Get user document reference (with sanitized userId)
   DocumentReference<Map<String, dynamic>> getUserRef(String userId) {
-    return _firestore.collection('users').doc(userId);
+    String sanitizedUserId = sanitizeUserId(userId); 
+    return _firestore.collection('users').doc(sanitizedUserId);
   }
 
   // Update WebRTC info

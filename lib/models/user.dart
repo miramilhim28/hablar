@@ -13,6 +13,7 @@ class User {
   final List<Contact> contacts;
   final List<String> history;
   final List<String> favorites;
+  final String? roomId;
 
   const User({
     required this.name,
@@ -26,6 +27,7 @@ class User {
     required this.contacts,
     required this.history,
     required this.favorites,
+    this.roomId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -40,6 +42,7 @@ class User {
     'contacts': contacts.map((contact) => contact.toJson()).toList(),
     'history': history,
     'favorites': favorites,
+    'roomId': roomId,
   };
 
   static User fromSnap(DocumentSnapshot snap) {
@@ -62,6 +65,9 @@ class User {
       contacts: contactList,
       history: List<String>.from(snapshot['history']),
       favorites: List<String>.from(snapshot['favorites']),
+      roomId: snapshot['roomId'],
     );
   }
 }
+
+
