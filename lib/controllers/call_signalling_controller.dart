@@ -5,7 +5,6 @@ import 'package:hablar_clone/services/firestore_service.dart';
 class CallSignallingController extends GetxController {
   final FirestoreService _firestoreService = FirestoreService();
 
-  // Reactive variables for state management
   RxBool isCallActive = false.obs;
   RxList<RTCIceCandidate> iceCandidates = <RTCIceCandidate>[].obs;
   RxString remoteSDP = ''.obs;
@@ -20,7 +19,6 @@ class CallSignallingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Initialize the peer connection when the controller is initialized
     _initializePeerConnection();
   }
 
@@ -32,14 +30,12 @@ class CallSignallingController extends GetxController {
       ],
     });
 
-    // Handle ICE Candidate
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       if (candidate.candidate != null) {
         iceCandidates.add(candidate);
       }
     };
 
-    // Handle incoming remote stream
     _peerConnection!.onAddStream = (MediaStream stream) {
       remoteStream.value = stream;
       update();
@@ -62,8 +58,10 @@ class CallSignallingController extends GetxController {
       RTCSessionDescription offer = await _peerConnection!.createOffer();
       await _peerConnection!.setLocalDescription(offer);
 
+      // Returning the offer and ICE candidates as a map
       return {
         'offerSDP': offer.sdp,
+        'offerType': offer.type,
         'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
       };
     } catch (e) {
@@ -84,6 +82,7 @@ class CallSignallingController extends GetxController {
         RTCSessionDescription(offerSDP, 'offer'),
       );
 
+      // Add ICE candidates received from the remote peer
       for (var candidate in remoteIceCandidates) {
         _peerConnection!.addCandidate(
           RTCIceCandidate(
@@ -100,6 +99,7 @@ class CallSignallingController extends GetxController {
       // Send the answer and ICE candidates back to the remote peer
       return {
         'answerSDP': answer.sdp,
+        'answerType': answer.type,
         'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
       };
     } catch (e) {
@@ -108,7 +108,7 @@ class CallSignallingController extends GetxController {
     }
   }
 
-  // Listen for changes in the call
+  // Listen for changes in the call (for answering calls, handling ICE candidates)
   void listenForCallChanges(String userId) {
     _firestoreService.listenToWebRTCChanges(userId).listen((snapshot) {
       var data = snapshot.data() as Map<String, dynamic>;
