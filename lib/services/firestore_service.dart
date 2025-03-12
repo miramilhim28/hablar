@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:hablar_clone/models/user.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -26,11 +27,11 @@ class FirestoreService {
     return getUserRef(userId).snapshots();
   }
 
-  // Clear WebRTC info (End Call)
+  // Clear WebRTC info
   Future<void> clearWebRTCInfo(String userId) async {
     try {
       await getUserRef(userId).update({
-        'werbRtcInfo': FieldValue.delete(),  // Deletes 'werbRtcInfo' field from Firestore
+        'werbRtcInfo': FieldValue.delete(),
       });
     } catch (e) {
       print("Error clearing WebRTC info: $e");
@@ -38,7 +39,7 @@ class FirestoreService {
     }
   }
 
-  // Store WebRTC offer (create room)
+  // Store WebRTC offer
   Future<void> storeOffer(String remoteUserId, RTCSessionDescription offer, String callerId) async {
     try {
       DocumentReference userRef = getUserRef(remoteUserId);
@@ -96,20 +97,37 @@ class FirestoreService {
     }
   }
 
-  // Clear the room data when the call ends
-  Future<void> clearRoomData(String roomId) async {
+  // Fetch a User from Firestore by uid
+  Future<User> getUserById(String userId) async {
     try {
-      DocumentReference roomRef = _firestore.collection('rooms').doc(roomId);
-      
-      // Clear ICE candidates and offer/answer
-      await roomRef.update({
-        'werbRtcInfo': FieldValue.delete(),
-      });
-
-      // Optionally delete the room if needed
-      await roomRef.delete();
+      DocumentSnapshot snapshot = await getUserRef(userId).get();
+      if (!snapshot.exists) {
+        throw Exception("User not found");
+      }
+      return User.fromSnap(snapshot); 
     } catch (e) {
-      print("Error clearing room data: $e");
+      print("Error fetching user: $e");
+      rethrow;
+    }
+  }
+
+  // Update user details 
+  Future<void> updateUserDetails(String userId, User user) async {
+    try {
+      await getUserRef(userId).update(user.toJson());
+    } catch (e) {
+      print("Error updating user details: $e");
+      rethrow;
+    }
+  }
+
+  // Store User
+  Future<void> storeUser(User user) async {
+    try {
+      DocumentReference userRef = getUserRef(user.uid);
+      await userRef.set(user.toJson());
+    } catch (e) {
+      print("Error storing user: $e");
       rethrow;
     }
   }

@@ -7,123 +7,134 @@ import 'package:hablar_clone/services/firestore_service.dart';
 class CallSignallingController extends GetxController {
   final FirestoreService _firestoreService = FirestoreService();
 
-  RTCPeerConnection? _peerConnection;
-  MediaStream? _localStream;
-  var isCallActive = false.obs;
+  // Reactive variables
+  RxBool isCallActive = false.obs;
+  Rx<RTCPeerConnection?> peerConnection = Rxn<RTCPeerConnection>();
+  Rx<MediaStream?> localStream = Rxn<MediaStream>();
+  Rx<MediaStream?> remoteStream = Rxn<MediaStream>();
+  
   String? currentUserId;
   String? remoteUserId;
 
   @override
   void onInit() {
     super.onInit();
+    // Initial setup if needed
   }
 
   // Initialize peer connection
   Future<void> _initializePeerConnection() async {
-    _peerConnection = await createPeerConnection({
+    peerConnection.value = await createPeerConnection(_getConfiguration());
+    await _addLocalTracks();
+    _setupPeerConnectionListeners();
+  }
+
+  // Peer connection configuration
+  Map<String, dynamic> _getConfiguration() {
+    return {
       'iceServers': [
         {'urls': 'stun:stun.l.google.com:19302'},
-        {
-          'urls': 'turn:your-turn-server.com',
-          'username': 'user',
-          'credential': 'pass',
-        },
       ],
-    });
+    };
+  }
 
-    _localStream = await webrtc.navigator.mediaDevices.getUserMedia({
+  // Add local media tracks to peer connection
+  Future<void> _addLocalTracks() async {
+    var stream = await webrtc.navigator.mediaDevices.getUserMedia({
       'audio': true,
       'video': false,
     });
 
-    for (var track in _localStream!.getAudioTracks()) {
-      _peerConnection!.addTrack(track, _localStream!);
-    }
+    localStream.value = stream;
+    peerConnection.value?.addTrack(stream.getAudioTracks().first, stream);
+  }
 
-    _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) async {
+  // Setup peer connection listeners
+  void _setupPeerConnectionListeners() {
+    peerConnection.value?.onIceCandidate = (RTCIceCandidate candidate) async {
       if (candidate.candidate != null && remoteUserId != null) {
         await _firestoreService.updateWebRTCInfo(remoteUserId!, {
           'werbRtcInfo': {
-            'iceCandidates': FieldValue.arrayUnion([
-              {
-                'candidate': candidate.candidate,
-                'sdpMid': candidate.sdpMid,
-                'sdpMLineIndex': candidate.sdpMLineIndex,
-              },
-            ]),
+            'iceCandidates': FieldValue.arrayUnion([{
+              'candidate': candidate.candidate,
+              'sdpMid': candidate.sdpMid,
+              'sdpMLineIndex': candidate.sdpMLineIndex,
+            }]),
           },
         });
       }
+    };
+
+    peerConnection.value?.onTrack = (RTCTrackEvent event) {
+      remoteStream.value = event.streams[0];
+      remoteStream.value?.getTracks().forEach((track) {
+        print('Add remote track: $track');
+      });
     };
   }
 
   // Start Call
   Future<Map<String, dynamic>> createOffer({
-  required String myUserId,
-  required String remoteUserId,
-}) async {
-  if (myUserId.isEmpty || remoteUserId.isEmpty) {
-    throw Exception("Caller ID or Callee Id is missing.");
+    required String myUserId,
+    required String remoteUserId,
+  }) async {
+    if (myUserId.isEmpty || remoteUserId.isEmpty) {
+      throw Exception("Caller ID or Callee ID is missing.");
+    }
+
+    try {
+      await _initializePeerConnection();
+      isCallActive.value = true;
+
+      RTCSessionDescription offer = await peerConnection.value!.createOffer();
+      await peerConnection.value!.setLocalDescription(offer);
+
+      // Store the offer in Firestore
+      await _firestoreService.storeOffer(remoteUserId, offer, myUserId);
+
+      return {'offerSDP': offer.sdp};
+    } catch (e) {
+      Get.snackbar("Error", "Failed to create offer: ${e.toString()}");
+      rethrow;
+    }
   }
-
-  await _initializePeerConnection();
-  isCallActive.value = true;
-
-  // Create the offer
-  RTCSessionDescription offer = await _peerConnection!.createOffer();
-  await _peerConnection!.setLocalDescription(offer);
-
-  // Store the offer in Firestore under the recipient's document
-  DocumentReference userRef = FirebaseFirestore.instance
-      .collection('users')
-      .doc(remoteUserId);
-
-  await userRef.update({
-    'werbRtcInfo': {
-      'offerSDP': offer.sdp,
-      'callerId': myUserId,
-      'status': 'initiated',
-      'iceCandidates': [],
-    },
-  });
-
-  // Return the offer SDP for further use
-  return {'offerSDP': offer.sdp};
-}
-
 
   // Answer Call
   Future<void> answerCall(String calleeId) async {
-    currentUserId = calleeId;
+    try {
+      currentUserId = calleeId;
 
-    DocumentSnapshot snapshot =
-        await _firestoreService.getUserRef(calleeId).get();
-    var data = snapshot.data() as Map<String, dynamic>;
+      DocumentSnapshot snapshot =
+          await _firestoreService.getUserRef(calleeId).get();
+      var data = snapshot.data() as Map<String, dynamic>;
 
-    if (!data.containsKey('werbRtcInfo') ||
-        !data['werbRtcInfo'].containsKey('offerSDP')) {
-      Get.snackbar("Error", "No incoming call found");
-      return;
+      if (!data.containsKey('werbRtcInfo') ||
+          !data['werbRtcInfo'].containsKey('offerSDP')) {
+        Get.snackbar("Error", "No incoming call found");
+        return;
+      }
+
+      remoteUserId = data['werbRtcInfo']['callerId'];
+
+      await _initializePeerConnection();
+      await peerConnection.value!.setRemoteDescription(
+        RTCSessionDescription(data['werbRtcInfo']['offerSDP'], 'offer'),
+      );
+
+      RTCSessionDescription answer = await peerConnection.value!.createAnswer();
+      await peerConnection.value!.setLocalDescription(answer);
+
+      await _firestoreService.updateWebRTCInfo(remoteUserId!, {
+        'werbRtcInfo': {
+          'answerSDP': answer.sdp,
+          'status': 'answered',
+        },
+      });
+
+      listenForCallChanges(remoteUserId!);
+    } catch (e) {
+      Get.snackbar("Error", "Failed to answer call: ${e.toString()}");
     }
-
-    remoteUserId = data['werbRtcInfo']['callerId'];
-
-    await _initializePeerConnection();
-    await _peerConnection!.setRemoteDescription(
-      RTCSessionDescription(data['werbRtcInfo']['offerSDP'], 'offer'),
-    );
-
-    RTCSessionDescription answer = await _peerConnection!.createAnswer();
-    await _peerConnection!.setLocalDescription(answer);
-
-    await _firestoreService.updateWebRTCInfo(remoteUserId!, {
-      'werbRtcInfo': {
-        'answerSDP': answer.sdp,
-        'status': 'answered',
-      },
-    });
-
-    listenForCallChanges(remoteUserId!);
   }
 
   // Listen for Call Changes
@@ -135,14 +146,14 @@ class CallSignallingController extends GetxController {
         var werbRtcInfo = data['werbRtcInfo'];
 
         if (werbRtcInfo.containsKey('answerSDP')) {
-          _peerConnection!.setRemoteDescription(
+          peerConnection.value!.setRemoteDescription(
             RTCSessionDescription(werbRtcInfo['answerSDP'], 'answer'),
           );
         }
 
         if (werbRtcInfo.containsKey('iceCandidates')) {
           for (var candidate in werbRtcInfo['iceCandidates']) {
-            _peerConnection!.addCandidate(
+            peerConnection.value!.addCandidate(
               RTCIceCandidate(
                 candidate['candidate'],
                 candidate['sdpMid'],
@@ -156,18 +167,24 @@ class CallSignallingController extends GetxController {
   }
 
   // End Call
-  void endCall() {
+  Future<void> endCall() async {
     if (currentUserId != null) {
-      _firestoreService.clearWebRTCInfo(currentUserId!);
+      await _firestoreService.clearWebRTCInfo(currentUserId!);
     }
     if (remoteUserId != null) {
-      _firestoreService.clearWebRTCInfo(remoteUserId!);
+      await _firestoreService.clearWebRTCInfo(remoteUserId!);
     }
-    _peerConnection?.close();
-    _localStream?.dispose();
-    _peerConnection = null;
+    peerConnection.value?.close();
+    localStream.value?.dispose();
+    remoteStream.value?.dispose();
+    peerConnection.value = null;
     isCallActive.value = false;
     currentUserId = null;
     remoteUserId = null;
+  }
+
+  // Hang Up
+  Future<void> hangUp() async {
+    await endCall();
   }
 }
