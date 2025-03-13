@@ -99,6 +99,7 @@ class InfoScreen extends StatelessWidget {
                           () => JoinScreen(
                             callerId: currentUserId,
                             calleeId: contact.id,
+                            callType: "audio",
                           ),
                         );
                       },
@@ -115,7 +116,18 @@ class InfoScreen extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () {
+                        // Fetch the current user's ID
+                        String currentUserId =
+                            FirebaseAuth.instance.currentUser?.uid ?? '';
+                        Get.to(
+                          () => JoinScreen(
+                            callerId: currentUserId,
+                            calleeId: contact.id,
+                            callType: "video",
+                          ),
+                        );
+                      },
                       child: Column(
                         children: [
                           CircleAvatar(
@@ -212,12 +224,9 @@ class InfoScreen extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () {
-                // Call deleteContact in ContactsController
                 _deleteContact();
-                Navigator.of(context).pop(); // Close the dialog
-                Get.offAll(
-                  () => ContactScreen(),
-                ); // Navigate back to ContactScreen
+                Navigator.of(context).pop();
+                Get.offAll(() => ContactScreen());
               },
               child: Text(
                 "Yes",
@@ -250,7 +259,7 @@ class InfoScreen extends StatelessWidget {
 
   // Delete contact
   void _deleteContact() {
-    contactsController.deleteContact(contact.id); 
+    contactsController.deleteContact(contact.id);
     Get.back();
   }
 

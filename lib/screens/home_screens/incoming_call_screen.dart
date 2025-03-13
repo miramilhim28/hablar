@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/screens/home_screens/audio_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/video_call_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class IncomingCallScreen extends StatelessWidget {
@@ -10,55 +12,76 @@ class IncomingCallScreen extends StatelessWidget {
   final String callerId;
   final String calleeId;
   final String callerName;
+  final String callType;
 
   IncomingCallScreen({
     required this.callId,
     required this.callerId,
     required this.calleeId,
     required this.callerName,
+    required this.callType,
   });
 
   final CallSignallingController controller = Get.find<CallSignallingController>();
 
-  // Accept the incoming call
+  //Accept the Incoming Call
   Future<void> _acceptCall() async {
     try {
-      // Fetch the call details from Firestore
-      DocumentSnapshot callSnapshot = await FirebaseFirestore.instance.collection('users').doc(calleeId).get();
+      //Fetch the Room associated with this Call
+      DocumentSnapshot roomSnapshot = await FirebaseFirestore.instance
+          .collection('rooms')
+          .doc(callId)
+          .get();
 
-      if (!callSnapshot.exists) {
-        Get.snackbar("Error", "Call not found or already ended.");
+      if (!roomSnapshot.exists) {
+        Get.snackbar("Error", "Call room not found or already ended.");
         return;
       }
 
-      Map<String, dynamic>? callData = callSnapshot.data() as Map<String, dynamic>?;
+      var roomData = roomSnapshot.data() as Map<String, dynamic>?;
 
-      if (callData == null || !callData.containsKey('werbRtcInfo') || !callData['werbRtcInfo'].containsKey('offerSDP')) {
-        Get.snackbar("Error", "Invalid call data.");
+      if (roomData == null || !roomData.containsKey('werbRtcInfo')) {
+        Get.snackbar("Error", "Invalid room data.");
         return;
       }
 
-      // Accept the call by passing offer SDP and ICE candidates
-      await controller.createAnswer(
-        callData['werbRtcInfo']['offerSDP'],
-        callData['werbRtcInfo']['iceCandidates'],
-      );
+      //Join the WebRTC session (Handles SDP Answer)
+      await controller.joinRoom(callId, RTCVideoRenderer());
 
-      // Navigate to the audio call screen with the retrieved offer
-      Get.off(() => AudioCallScreen(
-        callerId: callerId,
-        calleeId: calleeId,
-        offer: callData['werbRtcInfo']['offerSDP'],
-      ));
+      // ✅ Update Firestore to mark call as `answered`
+      await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
+        'werbRtcInfo.callStatus': 'answered',
+      });
+
+      //Navigate to the correct call screen based on `callType`
+      if (callType == "video") {
+        Get.off(() => VideoCallScreen(
+              callerId: callerId,
+              calleeId: calleeId,
+              callId: callId,
+            ));
+      } else {
+        Get.off(() => AudioCallScreen(
+              callerId: callerId,
+              calleeId: calleeId,
+              callId: callId,
+            ));
+      }
     } catch (e) {
       Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
     }
   }
 
-  // Decline the incoming call
+  //Decline the Incoming Call
   Future<void> _declineCall() async {
     try {
-      controller.endCall();
+      //Update Firestore to mark the call as `declined`
+      await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
+        'werbRtcInfo.callStatus': 'declined',
+      });
+
+      //End WebRTC session and close screen
+      controller.hangUp();
       Get.back();
     } catch (e) {
       Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
@@ -90,13 +113,13 @@ class IncomingCallScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Accept Call Button
+                //Accept Call Button
                 IconButton(
                   icon: const Icon(Icons.call, color: Colors.green, size: 50),
                   onPressed: _acceptCall,
                 ),
                 const SizedBox(width: 50),
-                // Decline Call Button
+                //Decline Call Button
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
                   onPressed: _declineCall,

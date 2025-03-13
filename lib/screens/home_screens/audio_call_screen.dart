@@ -7,13 +7,15 @@ import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class AudioCallScreen extends StatefulWidget {
   final String callerId, calleeId;
+  final String callId;
   final dynamic offer;
 
   const AudioCallScreen({
     super.key,
-    this.offer,
+    required this.callId,
     required this.callerId,
     required this.calleeId,
+    this.offer,
   });
 
   @override
@@ -22,43 +24,93 @@ class AudioCallScreen extends StatefulWidget {
 
 class _AudioCallScreenState extends State<AudioCallScreen> {
   final CallSignallingController _callController = Get.put(CallSignallingController());
-  webrtc.MediaStream? _localStream;
   bool isAudioOn = true;
-  String callDuration = "00:00";
   bool isCallEnded = false;
+  bool isAnswered = false;
+  int callDurationInSeconds = 0;
+  String calleeName = "Unknown";
 
   @override
   void initState() {
     super.initState();
     _initializeAudioCall();
-    _startCallTimer();
+    _fetchCalleeName();
+    _listenForCallStatus();
   }
 
+  /// **Initialize Audio Call (WebRTC & Media)**
   Future<void> _initializeAudioCall() async {
   try {
-    _localStream = await webrtc.navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
-    
-    if (widget.offer != null) {
-      String offerSDP = widget.offer['offerSDP'];
-      
-      if (offerSDP.isNotEmpty) {
-        await _callController.createAnswer(offerSDP, widget.offer['offerSDP']);
-      }
+    await _callController.initializePeerConnection();
+    _callController.localStream =
+        await webrtc.navigator.mediaDevices.getUserMedia({'audio': true, 'video': false});
+
+    if (_callController.localStream != null) {
+      _callController.localStream!.getTracks().forEach((track) {
+        _callController.peerConnection?.addTrack(track, _callController.localStream!);
+      });
+    }
+
+    // ✅ Ensure `offer` exists before using it
+    if (widget.offer != null && widget.callId.isNotEmpty) {
+      await _callController.joinRoom(widget.callId, webrtc.RTCVideoRenderer());
     }
   } catch (e) {
     print("Error initializing audio call: $e");
   }
 }
 
+  /// **Fetch Callee Name from Firestore**
+  Future<void> _fetchCalleeName() async {
+    try {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.calleeId)
+          .get();
 
+      if (snapshot.exists && snapshot.data() != null) {
+        setState(() {
+          calleeName = snapshot['name'] ?? 'Unknown';
+        });
+      }
+    } catch (e) {
+      print('Error fetching callee name: $e');
+    }
+  }
+
+  /// **Listen for Call Status Updates from Firestore**
+  void _listenForCallStatus() {
+    FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(widget.callId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        String status = snapshot['callStatus'] ?? 'calling';
+        print("CALL STATUS: $status");
+
+        if (status == 'answered' && !isAnswered) {
+          setState(() {
+            isAnswered = true;
+          });
+          print("Call was answered! Timer should start now.");
+          _startCallTimer();
+        }
+
+        if (status == 'ended' && !isCallEnded) {
+          _endCall();
+        }
+      }
+    });
+  }
+
+  /// **Start Call Timer when Answered**
   void _startCallTimer() {
-    Duration duration = Duration();
     if (!isCallEnded) {
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted && !isCallEnded) {
           setState(() {
-            duration = Duration(seconds: duration.inSeconds + 1);
-            callDuration = "${duration.inMinutes.toString().padLeft(2, '0')}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}";
+            callDurationInSeconds += 1;
           });
           _startCallTimer();
         }
@@ -66,34 +118,21 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
     }
   }
 
-  // Fetch callee's name from contacts array
-  Future<String> getCalleeName(String calleeId) async {
-  try {
-    DocumentSnapshot snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.callerId)  
-        .get();
+  /// **End Call**
+  Future<void> _endCall() async {
+    if (!isCallEnded) {
+      setState(() {
+        isCallEnded = true;
+      });
 
-    if (snapshot.exists && snapshot.data() != null) {
-      List<dynamic> contacts = snapshot['contacts'];
-
-      for (var contact in contacts) {
-        if (contact['id'] == calleeId) {
-          return contact['name'] ?? 'Unknown'; 
-        }
-      }
+      await _callController.hangUp();
+      Get.back();
     }
-    return 'Unknown'; 
-  } catch (e) {
-    print('Error fetching callee name: $e');
-    return 'Unknown'; 
   }
-}
-
 
   @override
   void dispose() {
-    _localStream?.dispose();
+    _callController.localStream?.dispose();
     super.dispose();
   }
 
@@ -113,7 +152,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Profile Picture & Caller/Callee Info
+              // Profile Picture & Caller Info
               CircleAvatar(
                 radius: 70,
                 backgroundColor: utils.white,
@@ -125,38 +164,19 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Fetching Callee Name
-              FutureBuilder<String>(
-                future: getCalleeName(widget.calleeId),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return CircularProgressIndicator();
-                  } else if (snapshot.hasError || !snapshot.hasData) {
-                    return Text(
-                      'Unknown',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: utils.white,
-                      ),
-                    );
-                  } else {
-                    return Text(
-                      snapshot.data!,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: utils.white,
-                      ),
-                    );
-                  }
-                },
+              Text(
+                calleeName,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: utils.white,
+                ),
               ),
               const SizedBox(height: 10),
+
               Text(
-                "In Call",
+                isAnswered ? "In Call" : "Calling...",
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 16,
@@ -165,22 +185,23 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
               ),
               const SizedBox(height: 30),
 
-              // Call Timer
-              Text(
-                callDuration,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: utils.darkGrey,
+              if (isAnswered)
+                Text(
+                  "${(callDurationInSeconds ~/ 60).toString().padLeft(2, '0')}:" +
+                  "${(callDurationInSeconds % 60).toString().padLeft(2, '0')}",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: utils.darkGrey,
+                  ),
                 ),
-              ),
               const SizedBox(height: 40),
 
-              // Audio Controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Mute/Unmute Button
                   IconButton(
                     icon: Icon(
                       isAudioOn ? Icons.mic : Icons.mic_off,
@@ -190,19 +211,21 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
                     onPressed: () {
                       setState(() {
                         isAudioOn = !isAudioOn;
+                        _callController.localStream?.getAudioTracks().first.enabled =
+                            isAudioOn;
                       });
                     },
                   ),
                   const SizedBox(width: 40),
+
+                  // End Call Button
                   IconButton(
                     icon: Icon(
                       Icons.call_end,
                       color: Colors.red,
                       size: 40,
                     ),
-                    onPressed: () async {
-                      Get.back();
-                    },
+                    onPressed: _endCall,
                   ),
                 ],
               ),

@@ -1,190 +1,239 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
+import 'package:hablar_clone/screens/home_screens/audio_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/video_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/incoming_call_screen.dart';
 import 'package:hablar_clone/services/firestore_service.dart';
 
 class CallSignallingController extends GetxController {
   final FirestoreService _firestoreService = FirestoreService();
 
+  Map<String, dynamic> configuration = {
+    'iceServers': [
+      {
+        'urls': [
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+        ]
+      }
+    ]
+  };
+
+  RTCPeerConnection? peerConnection;
+  MediaStream? localStream;
+  String? roomId;
   RxBool isCallActive = false.obs;
   RxList<RTCIceCandidate> iceCandidates = <RTCIceCandidate>[].obs;
+  Rx<MediaStream?> remoteStream = Rx<MediaStream?>(null);
   RxString remoteSDP = ''.obs;
-  Rx<MediaStream?> localStream = Rxn<MediaStream>();
-  Rx<MediaStream?> remoteStream = Rxn<MediaStream>();
-
-  RTCPeerConnection? _peerConnection;
-  String? currentUserId;
-  String? remoteUserId;
-  String? roomId;
 
   @override
   void onInit() {
     super.onInit();
-    _initializePeerConnection();
+    initializePeerConnection();
   }
 
-  // Initialize Peer Connection
-  Future<void> _initializePeerConnection() async {
-    _peerConnection = await createPeerConnection({
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ],
+  /// **Initialize WebRTC Peer Connection**
+  Future<void> initializePeerConnection() async { // ✅ Made it public
+  peerConnection = await createPeerConnection({
+    'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}],
+  });
+
+  peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+    if (candidate.candidate != null) {
+      iceCandidates.add(candidate);
+    }
+  };
+
+  peerConnection!.onAddStream = (MediaStream stream) {
+    remoteStream.value = stream;
+    update();
+  };
+}
+
+  /// **Create a New Call Room (Caller)**
+  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
+    FirebaseFirestore db = FirebaseFirestore.instance;
+    DocumentReference roomRef = db.collection('rooms').doc();
+    
+    peerConnection = await createPeerConnection(configuration);
+    registerPeerConnectionListeners();
+
+    localStream?.getTracks().forEach((track) {
+      peerConnection?.addTrack(track, localStream!);
     });
 
-    _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
-      if (candidate.candidate != null) {
-        iceCandidates.add(candidate);
-      }
+    // Store ICE Candidates
+    var callerCandidatesCollection = roomRef.collection('callerCandidates');
+    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+      callerCandidatesCollection.add(candidate.toMap());
     };
 
-    _peerConnection!.onAddStream = (MediaStream stream) {
-      remoteStream.value = stream;
-      update();
-    };
-  }
+    // Create SDP Offer
+    RTCSessionDescription offer = await peerConnection!.createOffer();
+    await peerConnection!.setLocalDescription(offer);
 
-  // Create an Offer SDP for initiating a call
-  Future<Map<String, dynamic>> createOffer({
-    required String myUserId,
-    required String remoteUserId,
-  }) async {
-    if (myUserId.isEmpty || remoteUserId.isEmpty) {
-      throw Exception("Caller ID or Callee ID is missing.");
-    }
-
-    try {
-      await _initializePeerConnection();
-      isCallActive.value = true;
-
-      RTCSessionDescription offer = await _peerConnection!.createOffer();
-      await _peerConnection!.setLocalDescription(offer);
-
-      // Returning the offer and ICE candidates as a map
-      return {
-        'offerSDP': offer.sdp,
-        'offerType': offer.type,
-        'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
-      };
-    } catch (e) {
-      Get.snackbar("Error", "Failed to create offer: ${e.toString()}");
-      rethrow;
-    }
-  }
-
-  // Create an Answer SDP to accept a call
-  Future<Map<String, dynamic>> createAnswer(
-    String offerSDP,
-    List<dynamic> remoteIceCandidates,
-  ) async {
-    try {
-      await _initializePeerConnection();
-      remoteSDP.value = offerSDP;
-      await _peerConnection!.setRemoteDescription(
-        RTCSessionDescription(offerSDP, 'offer'),
-      );
-
-      // Add ICE candidates received from the remote peer
-      for (var candidate in remoteIceCandidates) {
-        _peerConnection!.addCandidate(
-          RTCIceCandidate(
-            candidate['candidate'],
-            candidate['sdpMid'],
-            candidate['sdpMLineIndex'],
-          ),
-        );
-      }
-
-      RTCSessionDescription answer = await _peerConnection!.createAnswer();
-      await _peerConnection!.setLocalDescription(answer);
-
-      // Send the answer and ICE candidates back to the remote peer
-      return {
-        'answerSDP': answer.sdp,
-        'answerType': answer.type,
-        'iceCandidates': iceCandidates.map((c) => c.toMap()).toList(),
-      };
-    } catch (e) {
-      Get.snackbar("Error", "Failed to create answer: ${e.toString()}");
-      rethrow;
-    }
-  }
-
-  // Listen for changes in the call (for answering calls, handling ICE candidates)
-  void listenForCallChanges(String userId) {
-    _firestoreService.listenToWebRTCChanges(userId).listen((snapshot) {
+    await roomRef.set({'offer': offer.toMap()});
+    roomId = roomRef.id;
+    
+    roomRef.snapshots().listen((snapshot) async {
+      if (!snapshot.exists) return;
       var data = snapshot.data() as Map<String, dynamic>;
 
-      if (data.containsKey('werbRtcInfo')) {
-        var werbRtcInfo = data['werbRtcInfo'];
-
-        if (werbRtcInfo.containsKey('answerSDP')) {
-          _peerConnection!.setRemoteDescription(
-            RTCSessionDescription(werbRtcInfo['answerSDP'], 'answer'),
-          );
-        }
-
-        if (werbRtcInfo.containsKey('iceCandidates')) {
-          for (var candidate in werbRtcInfo['iceCandidates']) {
-            _peerConnection!.addCandidate(
-              RTCIceCandidate(
-                candidate['candidate'],
-                candidate['sdpMid'],
-                candidate['sdpMLineIndex'],
-              ),
-            );
-          }
-        }
+      if (peerConnection?.getRemoteDescription() == null && data['answer'] != null) {
+        var answer = RTCSessionDescription(data['answer']['sdp'], data['answer']['type']);
+        await peerConnection?.setRemoteDescription(answer);
       }
     });
+
+    // Listen for ICE candidates
+    roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        var data = change.doc.data() as Map<String, dynamic>;
+        peerConnection!.addCandidate(
+          RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']),
+        );
+      }
+    });
+
+    return roomId!;
   }
 
-  // End the call
-  void endCall() {
-    _peerConnection?.close();
-    _peerConnection = null;
-    isCallActive.value = false;
-    iceCandidates.clear();
-    remoteSDP.value = '';
+  /// **Join an Existing Call Room (Callee)**
+  Future<void> joinRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
+    FirebaseFirestore db = FirebaseFirestore.instance;
+    DocumentReference roomRef = db.collection('rooms').doc(roomId);
+    var roomSnapshot = await roomRef.get();
+
+    if (roomSnapshot.exists) {
+      peerConnection = await createPeerConnection(configuration);
+      registerPeerConnectionListeners();
+
+      localStream?.getTracks().forEach((track) {
+        peerConnection?.addTrack(track, localStream!);
+      });
+
+      // Store ICE Candidates
+      var calleeCandidatesCollection = roomRef.collection('calleeCandidates');
+      peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+        calleeCandidatesCollection.add(candidate.toMap());
+      };
+
+      // Retrieve Offer & Create Answer
+      var data = roomSnapshot.data() as Map<String, dynamic>;
+      var offer = data['offer'];
+      await peerConnection!.setRemoteDescription(
+        RTCSessionDescription(offer['sdp'], offer['type']),
+      );
+
+      var answer = await peerConnection!.createAnswer();
+      await peerConnection!.setLocalDescription(answer);
+
+      await roomRef.update({
+        'answer': {'type': answer.type, 'sdp': answer.sdp}
+      });
+
+      // Listen for ICE Candidates
+      roomRef.collection('callerCandidates').snapshots().listen((snapshot) {
+        for (var change in snapshot.docChanges) {
+          var data = change.doc.data() as Map<String, dynamic>;
+          peerConnection!.addCandidate(
+            RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']),
+          );
+        }
+      });
+    }
   }
 
-  // Hang Up the call
+  /// **Start a Call (Audio or Video)**
+  Future<void> startCall({
+    required String callerId,
+    required String calleeId,
+    required String callType,
+  }) async {
+    FirebaseFirestore db = FirebaseFirestore.instance;
+    DocumentReference roomRef = db.collection('rooms').doc();
+
+    Map<String, dynamic> newCall = {
+      'callId': roomRef.id,
+      'callerId': callerId,
+      'calleeId': calleeId,
+      'callType': callType,
+      'callStatus': "calling",
+      'callTime': FieldValue.serverTimestamp(),
+    };
+
+    await roomRef.set(newCall);
+    navigateToCallScreen(roomRef.id);
+  }
+
+  /// **Navigate to the Correct Call Screen**
+  Future<void> navigateToCallScreen(String callId) async {
+    DocumentSnapshot callSnapshot =
+        await FirebaseFirestore.instance.collection('rooms').doc(callId).get();
+
+    if (callSnapshot.exists) {
+      String callType = callSnapshot['callType'] ?? 'audio';
+
+      if (callType == 'video') {
+        Get.to(() => VideoCallScreen(
+              callerId: callSnapshot['callerId'],
+              calleeId: callSnapshot['calleeId'],
+              callId: callSnapshot['callId'],
+              offer: callSnapshot['offer'],
+            ));
+      } else {
+        Get.to(() => AudioCallScreen(
+              callerId: callSnapshot['callerId'],
+              calleeId: callSnapshot['calleeId'],
+              callId: callSnapshot['callId'],
+              offer: callSnapshot['offer'],
+            ));
+      }
+    }
+  }
+
+  /// **End Call & Clean Up**
   Future<void> hangUp() async {
-    endCall();
+    FirebaseFirestore db = FirebaseFirestore.instance;
+    DocumentReference roomRef = db.collection('rooms').doc(roomId);
+
+    await roomRef.collection('calleeCandidates').get().then((snapshot) {
+      for (var doc in snapshot.docs) {
+        doc.reference.delete();
+      }
+    });
+
+    await roomRef.collection('callerCandidates').get().then((snapshot) {
+      for (var doc in snapshot.docs) {
+        doc.reference.delete();
+      }
+    });
+
+    await roomRef.delete();
+
+    localStream?.dispose();
+    remoteStream.value?.dispose();
+    peerConnection?.close();
   }
 
-  // Store ICE candidates in Firestore
-  Future<void> storeIceCandidates(
-    String remoteUserId,
-    List<RTCIceCandidate> candidates,
-  ) async {
-    try {
-      await _firestoreService.storeIceCandidates(remoteUserId, candidates);
-    } catch (e) {
-      Get.snackbar("Error", "Failed to store ICE candidates: ${e.toString()}");
-    }
-  }
+  /// **Register WebRTC Events**
+  void registerPeerConnectionListeners() {
+    peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
+      print('ICE gathering state changed: $state');
+    };
 
-  // Store the WebRTC offer in Firestore
-  Future<void> storeOffer(
-    String remoteUserId,
-    RTCSessionDescription offer,
-    String callerId,
-  ) async {
-    try {
-      await _firestoreService.storeOffer(remoteUserId, offer, callerId);
-    } catch (e) {
-      Get.snackbar("Error", "Failed to store offer: ${e.toString()}");
-    }
-  }
+    peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
+      print('Connection state changed: $state');
+    };
 
-  // Store the WebRTC answer in Firestore
-  Future<void> storeAnswer(
-    String remoteUserId,
-    RTCSessionDescription answer,
-  ) async {
-    try {
-      await _firestoreService.storeAnswer(remoteUserId, answer);
-    } catch (e) {
-      Get.snackbar("Error", "Failed to store answer: ${e.toString()}");
-    }
+    peerConnection?.onSignalingState = (RTCSignalingState state) {
+      print('Signaling state changed: $state');
+    };
+
+    peerConnection?.onAddStream = (MediaStream stream) {
+      remoteStream.value = stream;
+    };
   }
 }

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'contact.dart';
+import 'calls.dart';
 
 class User {
   final String name;
@@ -11,7 +12,7 @@ class User {
   final String uid;
   final Map<String, dynamic> werbRtcInfo;
   final List<Contact> contacts;
-  final List<String> history;
+  final List<String> calls;
   final List<String> favorites;
   final String? roomId;
 
@@ -25,7 +26,7 @@ class User {
     required this.uid,
     required this.werbRtcInfo,
     required this.contacts,
-    required this.history,
+    required this.calls,
     required this.favorites,
     this.roomId,
   });
@@ -40,7 +41,7 @@ class User {
     'uid': uid,
     'werbRtcInfo': werbRtcInfo,
     'contacts': contacts.map((contact) => contact.toJson()).toList(),
-    'history': history,
+    'calls': calls,
     'favorites': favorites,
     'roomId': roomId,
   };
@@ -63,7 +64,7 @@ class User {
       uid: snapshot['uid'],
       werbRtcInfo: snapshot['werbRtcInfo'] ?? {},
       contacts: contactList,
-      history: List<String>.from(snapshot['history']),
+      calls: List<String>.from(snapshot['calls']),
       favorites: List<String>.from(snapshot['favorites']),
       roomId: snapshot['roomId'],
     );

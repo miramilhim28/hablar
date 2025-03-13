@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/models/user.dart' as model;
 import 'package:hablar_clone/screens/landing_screen.dart';
-import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -71,7 +70,7 @@ class AuthController extends GetxController {
         uid: cred.user!.uid,
         bio: '',
         werbRtcInfo: werbRtcInfo,
-        history: [],
+        calls: [],
         favorites: [],
         contacts: [],
       );
@@ -143,7 +142,7 @@ class AuthController extends GetxController {
               .collection('users')
               .doc(userCredential.user!.uid)
               .get();
-      Map<String, dynamic>? webrtcData = userDoc['werbRtcInfo'];
+      //Map<String, dynamic>? webrtcData = userDoc['werbRtcInfo'];
 
       Get.snackbar(
         'Success',

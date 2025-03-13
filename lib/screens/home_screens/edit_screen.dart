@@ -41,7 +41,7 @@ class EditScreen extends StatelessWidget {
                     onPressed: () => Get.back(),
                   ),
                   Text(
-                    'Edit Contact',
+                    'Edit User',
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 24,

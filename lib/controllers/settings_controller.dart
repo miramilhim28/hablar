@@ -90,4 +90,3 @@ class SettingsController extends GetxController {
     super.onClose();
   }
 }
-
