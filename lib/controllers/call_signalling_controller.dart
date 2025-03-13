@@ -87,7 +87,7 @@ class CallSignallingController extends GetxController {
     });
 
     // Listen for ICE candidates
-    roomRef.collection('iceCandidates').snapshots().listen((snapshot) {
+    roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
       for (var change in snapshot.docChanges) {
         var data = change.doc.data() as Map<String, dynamic>;
         peerConnection!.addCandidate(
@@ -134,7 +134,7 @@ class CallSignallingController extends GetxController {
       });
 
       // Listen for ICE Candidates
-      roomRef.collection('iceCandidates').snapshots().listen((snapshot) {
+      roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
         for (var change in snapshot.docChanges) {
           var data = change.doc.data() as Map<String, dynamic>;
           peerConnection!.addCandidate(
@@ -166,6 +166,36 @@ class CallSignallingController extends GetxController {
     await roomRef.set(newCall);
     navigateToCallScreen(roomRef.id);
   }
+
+  void listenForIncomingCalls(String calleeId) {
+  FirebaseFirestore.instance
+      .collection('calls')
+      .where('calleeId', isEqualTo: calleeId)
+      .where('callStatus', isEqualTo: 'calling')
+      .snapshots()
+      .listen((snapshot) {
+    if (snapshot.docs.isNotEmpty) {
+      var callData = snapshot.docs.first.data();
+      String callId = callData['callId'];
+      String callerId = callData['callerId'];
+      String callType = callData['callType'];
+      String callerName = "Unknown Caller";
+
+      if (Get.currentRoute != '/IncomingCallScreen') {
+        Get.to(() => IncomingCallScreen(
+              callId: callId,
+              callerId: callerId,
+              calleeId: calleeId,
+              callerName: callerName,
+              callType: callType,
+            ));
+      }
+    }
+  }, onError: (error) {
+    print("Error listening for incoming calls: $error");
+  });
+}
+
 
   /// **Navigate to the Correct Call Screen**
   Future<void> navigateToCallScreen(String callId) async {
