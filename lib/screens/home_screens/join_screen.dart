@@ -33,22 +33,20 @@ class _JoinScreenState extends State<JoinScreen> {
   @override
   void initState() {
     super.initState();
-    _startCall(); // Auto-start call when screen opens
+    _startCall();
   }
 
-  /// **Start a Call (Caller)**
   Future<void> _startCall() async {
   setState(() {
     isLoading = true;
   });
 
   try {
-    // ✅ Create WebRTC Room and Offer
+    //Create WebRTC Room and Offer
     String roomId = await callController.createRoom(RTCVideoRenderer());
-    print("📞 Room Created: $roomId");
+    print("Room Created: $roomId");
 
-    // ✅ Wait for Local SDP Offer to be Set
-    await Future.delayed(Duration(seconds: 1));  // Ensure SDP is set properly
+    await Future.delayed(Duration(seconds: 1));
 
     RTCSessionDescription? offerSDP = await callController.peerConnection?.getLocalDescription();
 
@@ -56,14 +54,12 @@ class _JoinScreenState extends State<JoinScreen> {
       throw Exception("Local SDP offer is null.");
     }
 
-    // ✅ Store Call Data in Firestore
     await _firestoreService.storeOffer(
       widget.calleeId,
-      offerSDP,  // Store the actual offer retrieved
+      offerSDP,
       widget.callerId,
     );
 
-    // ✅ Listen for Answer from Callee
     _listenForAnswer(roomId);
   } catch (e) {
     Get.snackbar("Error", "Failed to start call: $e");
@@ -75,14 +71,14 @@ class _JoinScreenState extends State<JoinScreen> {
 }
 
 
-  /// **Listen for SDP Answer**
+  //Listen for SDP Answer
   void _listenForAnswer(String roomId) {
-    FirebaseFirestore.instance.collection('rooms').doc(roomId).snapshots().listen((snapshot) {
+    FirebaseFirestore.instance.collection('calls').doc(roomId).snapshots().listen((snapshot) {
       if (snapshot.exists) {
         var roomData = snapshot.data() as Map<String, dynamic>;
 
         if (roomData.containsKey('answer')) {
-          print("✅ Call Answered! Navigating...");
+          print("Call Answered! Navigating...");
 
           // Navigate to correct call screen
           if (widget.callType == "video") {

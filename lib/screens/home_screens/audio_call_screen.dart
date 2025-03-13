@@ -81,7 +81,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
   /// **Listen for Call Status Updates from Firestore**
   void _listenForCallStatus() {
     FirebaseFirestore.instance
-        .collection('rooms')
+        .collection('calls')
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {

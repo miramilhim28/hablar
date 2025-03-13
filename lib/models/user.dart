@@ -12,9 +12,8 @@ class User {
   final String uid;
   final Map<String, dynamic> werbRtcInfo;
   final List<Contact> contacts;
-  final List<String> calls;
+  final List<Call> calls;
   final List<String> favorites;
-  final String? roomId;
 
   const User({
     required this.name,
@@ -28,23 +27,21 @@ class User {
     required this.contacts,
     required this.calls,
     required this.favorites,
-    this.roomId,
   });
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'email': email,
-    'photoUrl': photoUrl,
-    'bio': bio,
-    'password': password,
-    'phone': phone,
-    'uid': uid,
-    'werbRtcInfo': werbRtcInfo,
-    'contacts': contacts.map((contact) => contact.toJson()).toList(),
-    'calls': calls,
-    'favorites': favorites,
-    'roomId': roomId,
-  };
+        'name': name,
+        'email': email,
+        'photoUrl': photoUrl,
+        'bio': bio,
+        'password': password,
+        'phone': phone,
+        'uid': uid,
+        'werbRtcInfo': werbRtcInfo,
+        'contacts': contacts.map((contact) => contact.toJson()).toList(),
+        'calls': calls.map((call) => call.toJson()).toList(),
+        'favorites': favorites,
+      };
 
   static User fromSnap(DocumentSnapshot snap) {
     var snapshot = snap.data() as Map<String, dynamic>;
@@ -52,6 +49,11 @@ class User {
     List<Contact> contactList =
         (snapshot['contacts'] as List)
             .map((contactData) => Contact.fromJson(contactData))
+            .toList();
+
+    List<Call> callList =
+        (snapshot['calls'] as List)
+            .map((callData) => Call.fromJson(callData))
             .toList();
 
     return User(
@@ -64,11 +66,8 @@ class User {
       uid: snapshot['uid'],
       werbRtcInfo: snapshot['werbRtcInfo'] ?? {},
       contacts: contactList,
-      calls: List<String>.from(snapshot['calls']),
+      calls: callList,
       favorites: List<String>.from(snapshot['favorites']),
-      roomId: snapshot['roomId'],
     );
   }
 }
-
-

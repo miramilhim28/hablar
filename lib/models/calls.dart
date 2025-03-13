@@ -1,3 +1,4 @@
+import 'package:hablar_clone/models/rooms.dart';
 class Call {
   final String callId;
   final String calleeId;
@@ -6,8 +7,7 @@ class Call {
   final String callType;
   final String callStatus;
   final DateTime callTime;
-  final String roomId;
-  final Map<String, dynamic> werbRtcInfo;
+  final Room room;
 
   const Call({
     required this.callId,
@@ -17,8 +17,7 @@ class Call {
     required this.callType,
     required this.callStatus,
     required this.callTime,
-    required this.roomId,
-    required this.werbRtcInfo,
+    required this.room, 
   });
 
   Map<String, dynamic> toJson() => {
@@ -29,8 +28,7 @@ class Call {
         'callType': callType,
         'callStatus': callStatus,
         'callTime': callTime.toIso8601String(),
-        'roomId': roomId,
-        'werbRtcInfo': werbRtcInfo,
+        'room': room.toJson(),
       };
 
   factory Call.fromJson(Map<String, dynamic> json) {
@@ -39,11 +37,10 @@ class Call {
       calleeId: json['calleeId'],
       callerId: json['callerId'],
       phoneNumber: json['phoneNumber'],
-      callType: json['callType'], 
+      callType: json['callType'],
       callStatus: json['callStatus'],
       callTime: DateTime.parse(json['callTime']),
-      roomId: json['roomId'],
-      werbRtcInfo: json['werbRtcInfo'],
+      room: Room.fromJson(json['room']),
     );
   }
 }

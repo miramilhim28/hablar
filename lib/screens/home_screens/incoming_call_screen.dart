@@ -24,59 +24,69 @@ class IncomingCallScreen extends StatelessWidget {
 
   final CallSignallingController controller = Get.find<CallSignallingController>();
 
-  //Accept the Incoming Call
-  Future<void> _acceptCall() async {
-    try {
-      //Fetch the Room associated with this Call
-      DocumentSnapshot roomSnapshot = await FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(callId)
-          .get();
+  // Accept the Incoming Call
+Future<void> _acceptCall() async {
+  try {
+    DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
+        .collection('calls') 
+        .doc(callId)
+        .get();
 
-      if (!roomSnapshot.exists) {
-        Get.snackbar("Error", "Call room not found or already ended.");
-        return;
-      }
-
-      var roomData = roomSnapshot.data() as Map<String, dynamic>?;
-
-      if (roomData == null || !roomData.containsKey('werbRtcInfo')) {
-        Get.snackbar("Error", "Invalid room data.");
-        return;
-      }
-
-      //Join the WebRTC session (Handles SDP Answer)
-      await controller.joinRoom(callId, RTCVideoRenderer());
-
-      // ✅ Update Firestore to mark call as `answered`
-      await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
-        'werbRtcInfo.callStatus': 'answered',
-      });
-
-      //Navigate to the correct call screen based on `callType`
-      if (callType == "video") {
-        Get.off(() => VideoCallScreen(
-              callerId: callerId,
-              calleeId: calleeId,
-              callId: callId,
-            ));
-      } else {
-        Get.off(() => AudioCallScreen(
-              callerId: callerId,
-              calleeId: calleeId,
-              callId: callId,
-            ));
-      }
-    } catch (e) {
-      Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
+    if (!callSnapshot.exists) {
+      Get.snackbar("Error", "Call not found or already ended.");
+      return;
     }
+
+    DocumentSnapshot roomSnapshot = await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(callId)
+        .get();
+
+    if (!roomSnapshot.exists) {
+      Get.snackbar("Error", "Call room not found or already ended.");
+      return;
+    }
+
+    var roomData = roomSnapshot.data() as Map<String, dynamic>?;
+
+    if (roomData == null || !roomData.containsKey('werbRtcInfo')) {
+      Get.snackbar("Error", "Invalid room data.");
+      return;
+    }
+
+    await controller.joinRoom(callId, RTCVideoRenderer());
+
+    await FirebaseFirestore.instance.collection('calls').doc(callId).update({
+      'callStatus': 'answered', 
+    });
+
+    //Navigate to the correct call screen based on `callType`
+    String callType = callSnapshot['callType']; 
+    
+    if (callType == "video") {
+      Get.off(() => VideoCallScreen(
+            callerId: callerId,
+            calleeId: calleeId,
+            callId: callId,
+          ));
+    } else {
+      Get.off(() => AudioCallScreen(
+            callerId: callerId,
+            calleeId: calleeId,
+            callId: callId,
+          ));
+    }
+  } catch (e) {
+    Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
   }
+}
+
 
   //Decline the Incoming Call
   Future<void> _declineCall() async {
     try {
       //Update Firestore to mark the call as `declined`
-      await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
+      await FirebaseFirestore.instance.collection('calls').doc(callId).update({
         'werbRtcInfo.callStatus': 'declined',
       });
 
