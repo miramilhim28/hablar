@@ -34,8 +34,7 @@ class CallSignallingController extends GetxController {
     initializePeerConnection();
   }
 
-  /// **Initialize WebRTC Peer Connection**
-  Future<void> initializePeerConnection() async { // ✅ Made it public
+  Future<void> initializePeerConnection() async {
   peerConnection = await createPeerConnection({
     'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}],
   });
@@ -55,7 +54,7 @@ class CallSignallingController extends GetxController {
   /// **Create a New Call Room (Caller)**
   Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc();
+    DocumentReference roomRef = db.collection('calls').doc();
     
     peerConnection = await createPeerConnection(configuration);
     registerPeerConnectionListeners();
@@ -88,7 +87,7 @@ class CallSignallingController extends GetxController {
     });
 
     // Listen for ICE candidates
-    roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
+    roomRef.collection('iceCandidates').snapshots().listen((snapshot) {
       for (var change in snapshot.docChanges) {
         var data = change.doc.data() as Map<String, dynamic>;
         peerConnection!.addCandidate(
@@ -103,7 +102,7 @@ class CallSignallingController extends GetxController {
   /// **Join an Existing Call Room (Callee)**
   Future<void> joinRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc(roomId);
+    DocumentReference roomRef = db.collection('calls').doc(roomId);
     var roomSnapshot = await roomRef.get();
 
     if (roomSnapshot.exists) {
@@ -135,7 +134,7 @@ class CallSignallingController extends GetxController {
       });
 
       // Listen for ICE Candidates
-      roomRef.collection('callerCandidates').snapshots().listen((snapshot) {
+      roomRef.collection('iceCandidates').snapshots().listen((snapshot) {
         for (var change in snapshot.docChanges) {
           var data = change.doc.data() as Map<String, dynamic>;
           peerConnection!.addCandidate(
@@ -153,7 +152,7 @@ class CallSignallingController extends GetxController {
     required String callType,
   }) async {
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc();
+    DocumentReference roomRef = db.collection('calls').doc();
 
     Map<String, dynamic> newCall = {
       'callId': roomRef.id,
@@ -171,7 +170,7 @@ class CallSignallingController extends GetxController {
   /// **Navigate to the Correct Call Screen**
   Future<void> navigateToCallScreen(String callId) async {
     DocumentSnapshot callSnapshot =
-        await FirebaseFirestore.instance.collection('rooms').doc(callId).get();
+        await FirebaseFirestore.instance.collection('calls').doc(callId).get();
 
     if (callSnapshot.exists) {
       String callType = callSnapshot['callType'] ?? 'audio';
@@ -197,7 +196,7 @@ class CallSignallingController extends GetxController {
   /// **End Call & Clean Up**
   Future<void> hangUp() async {
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc(roomId);
+    DocumentReference roomRef = db.collection('calls').doc(roomId);
 
     await roomRef.collection('calleeCandidates').get().then((snapshot) {
       for (var doc in snapshot.docs) {
