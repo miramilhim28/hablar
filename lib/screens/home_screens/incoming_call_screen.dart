@@ -21,14 +21,15 @@ class IncomingCallScreen extends StatelessWidget {
     required this.callerName,
     required this.callType,
   });
+  
 
   final CallSignallingController controller = Get.find<CallSignallingController>();
 
-  // Accept the Incoming Call
-Future<void> _acceptCall() async {
+  /// **Accept the Incoming Call**
+ Future<void> _acceptCall() async {
   try {
     DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
-        .collection('calls') 
+        .collection('calls')
         .doc(callId)
         .get();
 
@@ -37,32 +38,12 @@ Future<void> _acceptCall() async {
       return;
     }
 
-    DocumentSnapshot roomSnapshot = await FirebaseFirestore.instance
-        .collection('rooms')
-        .doc(callId)
-        .get();
-
-    if (!roomSnapshot.exists) {
-      Get.snackbar("Error", "Call room not found or already ended.");
-      return;
-    }
-
-    var roomData = roomSnapshot.data() as Map<String, dynamic>?;
-
-    if (roomData == null || !roomData.containsKey('werbRtcInfo')) {
-      Get.snackbar("Error", "Invalid room data.");
-      return;
-    }
-
-    await controller.joinRoom(callId, RTCVideoRenderer());
+    await controller.joinRoom(callId);
 
     await FirebaseFirestore.instance.collection('calls').doc(callId).update({
-      'callStatus': 'answered', 
+      'callStatus': 'answered',
     });
 
-    //Navigate to the correct call screen based on `callType`
-    String callType = callSnapshot['callType']; 
-    
     if (callType == "video") {
       Get.off(() => VideoCallScreen(
             callerId: callerId,
@@ -82,21 +63,20 @@ Future<void> _acceptCall() async {
 }
 
 
-  //Decline the Incoming Call
+  /// **Decline the Incoming Call**
   Future<void> _declineCall() async {
-    try {
-      //Update Firestore to mark the call as `declined`
-      await FirebaseFirestore.instance.collection('calls').doc(callId).update({
-        'werbRtcInfo.callStatus': 'declined',
-      });
+  try {
+    await FirebaseFirestore.instance.collection('calls').doc(callId).update({
+      'callStatus': 'declined',
+    });
 
-      //End WebRTC session and close screen
-      controller.hangUp();
-      Get.back();
-    } catch (e) {
-      Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
-    }
+    controller.hangUp();
+    Get.back();
+  } catch (e) {
+    Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +92,7 @@ Future<void> _acceptCall() async {
             ),
             const SizedBox(height: 8),
             Text(
-              callerName,
+              callerName, // ✅ Fixed undefined variable
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,
@@ -123,16 +103,16 @@ Future<void> _acceptCall() async {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                //Accept Call Button
+                // Accept Call Button
                 IconButton(
                   icon: const Icon(Icons.call, color: Colors.green, size: 50),
                   onPressed: _acceptCall,
                 ),
                 const SizedBox(width: 50),
-                //Decline Call Button
+                // Decline Call Button
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
-                  onPressed: _declineCall,
+                  onPressed: _declineCall, // ✅ Fixed undefined function
                 ),
               ],
             ),

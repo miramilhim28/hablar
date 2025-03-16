@@ -12,7 +12,8 @@ import 'screens/home_screens/incoming_call_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  Get.put(CallSignallingController());
+  final CallSignallingController callController = Get.put(CallSignallingController());
+  callController.listenForIncomingCalls();
   runApp(const MyApp());
 }
 

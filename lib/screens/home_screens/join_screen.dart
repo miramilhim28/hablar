@@ -1,13 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 import 'package:hablar_clone/screens/home_screens/audio_call_screen.dart';
 import 'package:hablar_clone/screens/home_screens/video_call_screen.dart';
-import 'package:hablar_clone/services/firestore_service.dart';
 
 class JoinScreen extends StatefulWidget {
   final String callerId;
@@ -27,7 +25,6 @@ class JoinScreen extends StatefulWidget {
 
 class _JoinScreenState extends State<JoinScreen> {
   final CallSignallingController callController = Get.put(CallSignallingController());
-  final FirestoreService _firestoreService = FirestoreService();
   bool isLoading = false;
 
   @override
@@ -42,8 +39,7 @@ class _JoinScreenState extends State<JoinScreen> {
   });
 
   try {
-    //Create WebRTC Room and Offer
-    String roomId = await callController.createRoom(RTCVideoRenderer());
+    String roomId = await callController.createRoom();
     print("Room Created: $roomId");
 
     await Future.delayed(Duration(seconds: 1));
@@ -54,11 +50,15 @@ class _JoinScreenState extends State<JoinScreen> {
       throw Exception("Local SDP offer is null.");
     }
 
-    await _firestoreService.storeOffer(
-      widget.calleeId,
-      offerSDP,
-      widget.callerId,
-    );
+    await FirebaseFirestore.instance.collection('calls').doc(roomId).set({
+      'callId': roomId,
+      'callerId': widget.callerId,
+      'calleeId': widget.calleeId,
+      'callType': widget.callType,
+      'callStatus': 'calling',
+      'offer': {'sdp': offerSDP.sdp, 'type': offerSDP.type},
+      'timestamp': FieldValue.serverTimestamp(),
+    });
 
     _listenForAnswer(roomId);
   } catch (e) {
@@ -71,16 +71,15 @@ class _JoinScreenState extends State<JoinScreen> {
 }
 
 
-  //Listen for SDP Answer
+
   void _listenForAnswer(String roomId) {
-    FirebaseFirestore.instance.collection('calls').doc(roomId).snapshots().listen((snapshot) {
+    FirebaseFirestore.instance.collection('rooms').doc(roomId).snapshots().listen((snapshot) {
       if (snapshot.exists) {
         var roomData = snapshot.data() as Map<String, dynamic>;
 
         if (roomData.containsKey('answer')) {
           print("Call Answered! Navigating...");
 
-          // Navigate to correct call screen
           if (widget.callType == "video") {
             Get.off(() => VideoCallScreen(
                   callerId: widget.callerId,

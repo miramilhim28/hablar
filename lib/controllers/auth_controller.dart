@@ -58,7 +58,7 @@ class AuthController extends GetxController {
         password: passwordController.text,
       );
 
-      // ✅ Initialize WebRTC info as empty
+      //Initialize WebRTC info as empty
       Map<String, dynamic> werbRtcInfo = {'offerSDP': '', 'iceCandidates': []};
 
       model.User user = model.User(

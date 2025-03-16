@@ -8,14 +8,12 @@ import 'package:hablar_clone/utils/colors.dart' as utils;
 class VideoCallScreen extends StatefulWidget {
   final String callerId, calleeId;
   final String callId;
-  final dynamic offer;
 
   const VideoCallScreen({
     super.key,
     required this.callId,
     required this.callerId,
     required this.calleeId,
-    this.offer,
   });
 
   @override
@@ -30,14 +28,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool isVideoOn = true;
   bool isCallEnded = false;
   bool isAnswered = false;
-  int callDurationInSeconds = 0;
-  String calleeName = "Unknown";
 
   @override
   void initState() {
     super.initState();
     _initializeVideoCall();
-    _fetchCalleeName();
     _listenForCallStatus();
   }
 
@@ -57,9 +52,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         });
       }
 
-      if (widget.offer != null && widget.callId.isNotEmpty) {
-        await _callController.joinRoom(widget.callId, _remoteRenderer); 
-      }
+      await _callController.joinRoom(widget.callId);
 
       _callController.remoteStream.listen((stream) {
         if (stream != null) {
@@ -74,27 +67,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  Future<void> _fetchCalleeName() async {
-    try {
-      DocumentSnapshot snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.calleeId)
-          .get();
-
-      if (snapshot.exists && snapshot.data() != null) {
-        setState(() {
-          calleeName = snapshot['name'] ?? 'Unknown';
-        });
-      }
-    } catch (e) {
-      print('Error fetching callee name: $e');
-    }
-  }
-
-  //Listen for Call Status Updates from Firestore
   void _listenForCallStatus() {
     FirebaseFirestore.instance
-        .collection('calls')
+        .collection('rooms')
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
@@ -106,8 +81,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           setState(() {
             isAnswered = true;
           });
-          print("Call was answered! Timer should start now.");
-          _startCallTimer();
+          print("Call was answered!");
         }
 
         if (status == 'ended' && !isCallEnded) {
@@ -117,21 +91,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     });
   }
 
-  //Start Call Timer when Answered
-  void _startCallTimer() {
-    if (!isCallEnded) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted && !isCallEnded) {
-          setState(() {
-            callDurationInSeconds += 1;
-          });
-          _startCallTimer();
-        }
-      });
-    }
-  }
-
-  //End Call
   Future<void> _endCall() async {
     if (!isCallEnded) {
       setState(() {
@@ -196,21 +155,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       ),
                     ),
 
-                    // Callee Name & Call Status
+                    // Call Status
                     Positioned(
                       top: 40,
                       child: Column(
                         children: [
-                          Text(
-                            calleeName,
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: utils.white,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
                           Text(
                             isAnswered ? "In Call" : "Calling...",
                             style: TextStyle(
@@ -222,20 +171,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         ],
                       ),
                     ),
-                    if (isAnswered)
-                      Positioned(
-                        top: 80,
-                        child: Text(
-                          "${(callDurationInSeconds ~/ 60).toString().padLeft(2, '0')}:" +
-                          "${(callDurationInSeconds % 60).toString().padLeft(2, '0')}",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: utils.white,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
