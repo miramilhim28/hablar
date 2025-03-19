@@ -4,8 +4,9 @@ import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/info_controller.dart';
 import 'package:hablar_clone/controllers/contact_controller.dart';
 import 'package:hablar_clone/models/contact.dart' as model;
+import 'package:hablar_clone/screens/home_screens/chat_screens/chat_msgs_screen.dart';
 import 'package:hablar_clone/screens/home_screens/contacts_screen.dart';
-import 'package:hablar_clone/screens/home_screens/join_screen.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/join_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class InfoScreen extends StatelessWidget {
@@ -147,7 +148,22 @@ class InfoScreen extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () {
+                        String currentUserId =
+                            FirebaseAuth.instance.currentUser?.uid ?? '';
+
+                        List<String> ids = [currentUserId, contact.id];
+                        ids.sort();
+                        String chatId = ids.join("_");
+
+                        Get.to(
+                          () => ChatMsgsScreen(),
+                          arguments: {
+                            'chatId': chatId,
+                            'contactName': contact.name,
+                          },
+                        );
+                      },
                       child: Column(
                         children: [
                           CircleAvatar(

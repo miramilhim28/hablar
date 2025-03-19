@@ -1,39 +1,55 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/models/chats.dart';
-import 'package:hablar_clone/screens/home_screens/chats_screen.dart';
+import 'package:hablar_clone/models/message.dart';
 
 class ChatsController extends GetxController {
-  var search = ''.obs;
-  var selectedIndex = 3;
-  var chats =
-      <Chat>[
-        Chat(name: 'John Doe', time:'11:00'),
-        Chat(name: 'Person X', time:'9:00'),
-        Chat(name: 'Person Y', time:'Yesterday'),
-        Chat(name: 'Person Z', time:'Sunday'),
-      ].obs;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  var chats = <Chat>[].obs;
 
-  RxList<Chat> get filteredChats =>
-      search.value.isEmpty
-          ? chats
-          : chats
-              .where(
-                (Phone) => Phone.name.toLowerCase().contains(
-                  search.value.toLowerCase(),
-                ),
-              )
-              .toList()
-              .obs;
-  
-  void updateSearch(String s){
-    search.value = s;
+  @override
+  void onInit() {
+    super.onInit();
+    fetchChats();
   }
 
-  void updateSelectedIndex(int index){
-    selectedIndex = index;
+  void fetchChats() {
+  String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  _firestore
+      .collection('chats')
+      .where('participants', arrayContains: currentUserId)
+      .snapshots()
+      .listen((snapshot) {
+    chats.assignAll(snapshot.docs
+        .map((doc) => Chat.fromJson(doc.data() as Map<String, dynamic>))
+        .toList());
+  });
+}
+
+  Stream<List<Message>> getMessages(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Message.fromJson(doc.data() as Map<String, dynamic>)).toList());
   }
 
-  void goToChatDetails(Chat chat) {
-    Get.toNamed(ChatsScreen() as String);
+  Future<void> sendMessage(String chatId, String senderId, String text) async {
+    await _firestore.collection('chats').doc(chatId).collection('messages').add({
+      'senderId': senderId,
+      'text': text,
+      'timestamp': FieldValue.serverTimestamp(),
+      'messageType': 'text',
+    });
+
+    // Update last message in chat
+    await _firestore.collection('chats').doc(chatId).update({
+      'lastMessage': text,
+      'time': FieldValue.serverTimestamp(),
+    });
   }
 }

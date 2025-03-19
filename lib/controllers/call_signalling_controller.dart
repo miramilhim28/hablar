@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:get/get.dart';
-import 'package:hablar_clone/screens/home_screens/audio_call_screen.dart';
-import 'package:hablar_clone/screens/home_screens/video_call_screen.dart';
-import 'package:hablar_clone/screens/home_screens/incoming_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/audio_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/video_call_screen.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/incoming_call_screen.dart';
 
 class CallSignallingController extends GetxController {
 
@@ -45,7 +45,7 @@ class CallSignallingController extends GetxController {
     };
   }
 
-  /// **Open User Media (Camera & Microphone)**
+  // Open user media
   Future<void> openUserMedia() async {
     localStream = await webrtc.navigator.mediaDevices.getUserMedia({
       'audio': true,
@@ -53,7 +53,7 @@ class CallSignallingController extends GetxController {
     });
   }
 
-  /// **Create a Room and Store WebRTC Offer**
+  //Create a eoom and store WebRTC Offer
   Future<String> createRoom() async {
     await openUserMedia(); 
 
@@ -90,42 +90,61 @@ class CallSignallingController extends GetxController {
     return roomId!;
   }
 
-  /// **Join an Existing Room (Handles SDP Answer)**
-  Future<void> joinRoom(String roomId) async {
-    await openUserMedia(); // ✅ Open Media Before Joining
+  // Join an existing room (SDP answer)
+  Future<void> joinRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
+  FirebaseFirestore db = FirebaseFirestore.instance;
+  DocumentReference roomRef = db.collection('calls').doc(roomId);
+  var roomSnapshot = await roomRef.get();
 
-    FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc(roomId);
-    var roomSnapshot = await roomRef.get();
+  if (roomSnapshot.exists) {
+    peerConnection = await createPeerConnection(configuration);
+    registerPeerConnectionListeners();
 
-    if (roomSnapshot.exists) {
-      peerConnection = await createPeerConnection(configuration);
-      registerPeerConnectionListeners();
+    // Add local stream to peer connection
+    localStream?.getTracks().forEach((track) {
+      peerConnection?.addTrack(track, localStream!);
+    });
 
-      localStream!.getTracks().forEach((track) {
-        peerConnection!.addTrack(track, localStream!);
-      });
+    // Store ICE candidates
+    var calleeCandidatesCollection = roomRef.collection('calleeCandidates');
+    peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+      calleeCandidatesCollection.add(candidate.toMap());
+    };
 
-      var data = roomSnapshot.data() as Map<String, dynamic>;
-      if (data.containsKey('offer')) {
-        var offer = data['offer'];
-        await peerConnection!.setRemoteDescription(
-          RTCSessionDescription(offer['sdp'], offer['type']),
+    // Retrieve offer and create answer
+    var data = roomSnapshot.data() as Map<String, dynamic>;
+    var offer = data['offer'];
+    await peerConnection!.setRemoteDescription(
+      RTCSessionDescription(offer['sdp'], offer['type']),
+    );
+
+    // Generate and Store answer SDP
+    var answer = await peerConnection!.createAnswer();
+    await peerConnection!.setLocalDescription(answer);
+
+    print("✅ Answer SDP Generated: ${answer.sdp}");
+
+    await roomRef.update({
+      'answer': {'type': answer.type, 'sdp': answer.sdp}
+    });
+
+    //Listen for ICE candidates
+    roomRef.collection('callerCandidates').snapshots().listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        var data = change.doc.data() as Map<String, dynamic>;
+        peerConnection!.addCandidate(
+          RTCIceCandidate(data['candidate'], data['sdpMid'], data['sdpMLineIndex']),
         );
       }
-
-      RTCSessionDescription answer = await peerConnection!.createAnswer();
-      await peerConnection!.setLocalDescription(answer);
-
-      await roomRef.update({'answer': {'type': answer.type, 'sdp': answer.sdp}});
-    }
+    });
   }
+}
 
-  void listenForIncomingCalls() {
-  print("📡 Listening for calls..."); // ✅ Debug Print
 
+  void listenForIncomingCalls(String userId, {required String calleeId}) {
   FirebaseFirestore.instance
-      .collection('calls') // ✅ Make sure this is the correct collection
+      .collection('calls')
+      .where('calleeId', isEqualTo: userId) 
       .where('callStatus', isEqualTo: 'calling')
       .snapshots()
       .listen((snapshot) {
@@ -133,38 +152,44 @@ class CallSignallingController extends GetxController {
       var callData = snapshot.docs.first.data();
       String callId = callData['callId'];
       String callerId = callData['callerId'];
-      String calleeId = callData['calleeId'];
       String callType = callData['callType'];
       String callerName = "Unknown Caller";
-
-      print("📞 Incoming call from: $callerId"); // ✅ Debug Print
 
       if (Get.currentRoute != '/IncomingCallScreen') {
         Get.to(() => IncomingCallScreen(
               callId: callId,
               callerId: callerId,
-              calleeId: calleeId,
+              calleeId: userId,
               callerName: callerName,
               callType: callType,
             ));
       }
     }
   }, onError: (error) {
-    print("🚨 Error listening for incoming calls: $error");
+    print("Error listening for incoming calls: $error");
   });
 }
 
 
 
 
-  /// **Handle Call Answer**
+
   Future<void> acceptCall(String callId) async {
-    await joinRoom(callId);
+  try {
+    RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+    await remoteRenderer.initialize();
+
+    await joinRoom(callId, remoteRenderer);
+
     await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
       'callStatus': 'answered',
     });
 
-    DocumentSnapshot callSnapshot = await FirebaseFirestore.instance.collection('rooms').doc(callId).get();
+    DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
+        .collection('rooms')
+        .doc(callId)
+        .get();
+
     String callType = callSnapshot['callType'];
 
     if (callType == "video") {
@@ -180,9 +205,12 @@ class CallSignallingController extends GetxController {
             callId: callId,
           ));
     }
+  } catch (e) {
+    Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
   }
+}
 
-  /// **Decline Call**
+
   Future<void> declineCall(String callId) async {
     await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
       'callStatus': 'declined',
@@ -192,46 +220,32 @@ class CallSignallingController extends GetxController {
     Get.back();
   }
 
-  /// **End Call & Clean Up**
   Future<void> hangUp() async {
-    if (localStream != null) {
-      for (var track in localStream!.getTracks()) {
-        track.stop();
-      }
-      localStream!.dispose();
+  if (roomId == null) return;
+  
+  FirebaseFirestore db = FirebaseFirestore.instance;
+  DocumentReference roomRef = db.collection('calls').doc(roomId);
+
+  await roomRef.update({'callStatus': 'ended'});
+
+  await roomRef.collection('calleeCandidates').get().then((snapshot) {
+    for (var doc in snapshot.docs) {
+      doc.reference.delete();
     }
+  });
 
-    if (remoteStream.value != null) {
-      for (var track in remoteStream.value!.getTracks()) {
-        track.stop();
-      }
-      remoteStream.value!.dispose();
+  await roomRef.collection('callerCandidates').get().then((snapshot) {
+    for (var doc in snapshot.docs) {
+      doc.reference.delete();
     }
+  });
 
-    peerConnection?.close();
-    peerConnection = null;
 
-    if (roomId != null) {
-      FirebaseFirestore db = FirebaseFirestore.instance;
-      DocumentReference roomRef = db.collection('rooms').doc(roomId);
+  localStream?.dispose();
+  remoteStream.value?.dispose();
+  peerConnection?.close();
+}
 
-      await roomRef.collection('callerCandidates').get().then((snapshot) {
-        for (var doc in snapshot.docs) {
-          doc.reference.delete();
-        }
-      });
-
-      await roomRef.collection('calleeCandidates').get().then((snapshot) {
-        for (var doc in snapshot.docs) {
-          doc.reference.delete();
-        }
-      });
-
-      await roomRef.delete();
-    }
-  }
-
-  /// **Register WebRTC Listeners**
   void registerPeerConnectionListeners() {
     peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
       print('ICE gathering state changed: $state');
