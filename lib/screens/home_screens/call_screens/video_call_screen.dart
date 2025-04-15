@@ -25,7 +25,9 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
-  final CallSignallingController _callController = Get.put(CallSignallingController());
+  final CallSignallingController _callController = Get.put(
+    CallSignallingController(),
+  );
   webrtc.RTCVideoRenderer _localRenderer = webrtc.RTCVideoRenderer();
   webrtc.RTCVideoRenderer _remoteRenderer = webrtc.RTCVideoRenderer();
   bool isAudioOn = true;
@@ -40,7 +42,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.initState();
     _initializeVideoCall();
     _listenForCallStatus();
-    _startCallTimeout(); 
+    _startCallTimeout();
   }
 
   void _startCallTimer() {
@@ -50,53 +52,46 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           setState(() {
             callDurationInSeconds += 1;
           });
-          _startCallTimer(); 
+          _startCallTimer();
         }
       });
     }
   }
 
   //Initialize WebRTC video call
-  Future<void> _initializeVideoCall() async {
-    try {
-      await _localRenderer.initialize();
-      await _remoteRenderer.initialize();
+  void _initializeVideoCall() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+    await _remoteRenderer.initialize();
 
-      //get user media with video
-      _callController.localStream =
-          await webrtc.navigator.mediaDevices.getUserMedia({
-        'audio': true,
-        'video': {
-          'facingMode': 'user', // Front camera
-          'width': {'ideal': 1280},
-          'height': {'ideal': 720}
-        }
-      });
-
-      //Attach local stream to UI
-      _localRenderer.srcObject = _callController.localStream;
-
-      if (_callController.localStream != null) {
-        _callController.localStream!.getTracks().forEach((track) {
-          _callController.peerConnection?.addTrack(track, _callController.localStream!);
+    _callController.localStream = await webrtc.navigator.mediaDevices
+        .getUserMedia({
+          'audio': true,
+          'video': {
+            'facingMode': 'user',
+            'width': {'ideal': 1280},
+            'height': {'ideal': 720},
+          },
         });
+
+    _localRenderer.srcObject = _callController.localStream;
+
+    print("🎥 Local video tracks:");
+    _callController.localStream?.getVideoTracks().forEach((track) {
+      print("Track ID: ${track.id}, Enabled: ${track.enabled}");
+    });
+
+    // ✅ Listen for Remote Stream & Assign to Remote Renderer
+    _callController.remoteStream.listen((stream) {
+      if (stream != null) {
+        _remoteRenderer.srcObject = stream;
+        print("✅ Remote video stream set to renderer");
       }
+    });
 
-      if (widget.offer != null && widget.callId.isNotEmpty) {
-        await _callController.joinRoom(widget.callId, _remoteRenderer);
-      }
-
-      //Listen for remote stream
-      _callController.remoteStream.listen((stream) {
-        if (stream != null) {
-          setState(() {
-            _remoteRenderer.srcObject = stream;
-          });
-        }
-      });
-
-    } catch (e) {
-      print("Error initializing video call: $e");
+    // ✅ Join the room to start WebRTC connection
+    if (widget.callId.isNotEmpty) {
+      await _callController.joinRoom(widget.callId, _remoteRenderer);
     }
   }
 
@@ -107,42 +102,52 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists) {
-        String status = snapshot['callStatus'] ?? 'calling';
-        print("CALL STATUS: $status");
+          if (snapshot.exists) {
+            String status = snapshot['callStatus'] ?? 'calling';
+            print("CALL STATUS: $status");
 
-        if (status == 'answered' && !isAnswered) {
-          _timeoutTimer?.cancel();
-          setState(() {
-            isAnswered = true;
-          });
-          print("Call was answered! Starting timer...");
-          _startCallTimer();
-        }
+            if (status == 'answered' && !isAnswered) {
+              _timeoutTimer?.cancel();
+              setState(() {
+                isAnswered = true;
+              });
+              print("Call was answered! Starting timer...");
+              _startCallTimer();
+            }
+            if (_callController.remoteStream.value != null) {
+              print("🔊 Ensuring Remote Audio is Active...");
+              _callController.remoteStream.value?.getAudioTracks().forEach((
+                track,
+              ) {
+                track.enabled = true;
+              });
+            }
 
-        if ((status == 'ended' || status == 'missed') && !isCallEnded) {
-          _endCall();
-        }
-      }
-    });
+            if ((status == 'ended' || status == 'missed') && !isCallEnded) {
+              _endCall();
+            }
+          }
+        });
   }
 
-  //automatically End Call If No Answer After 30 Seconds
+  //automatically End Call If No Answer After 15 Seconds
   void _startCallTimeout() {
-    _timeoutTimer = Timer(const Duration(seconds: 30), () async {
-      DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
-          .collection('calls')
-          .doc(widget.callId)
-          .get();
+    _timeoutTimer = Timer(const Duration(seconds: 15), () async {
+      DocumentSnapshot callSnapshot =
+          await FirebaseFirestore.instance
+              .collection('calls')
+              .doc(widget.callId)
+              .get();
 
       if (callSnapshot.exists) {
         String status = callSnapshot['callStatus'] ?? 'calling';
 
-        //If still calling after 30 sec, mark as missed
+        //If still calling after 15 sec, mark as missed
         if (status == 'calling') {
-          await FirebaseFirestore.instance.collection('calls').doc(widget.callId).update({
-            'callStatus': 'missed',
-          });
+          await FirebaseFirestore.instance
+              .collection('calls')
+              .doc(widget.callId)
+              .update({'callStatus': 'missed'});
         }
       }
     });
@@ -193,7 +198,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       width: double.infinity,
                       height: double.infinity,
                       color: Colors.black,
-                      child: webrtc.RTCVideoView(_remoteRenderer),
+                      child: webrtc.RTCVideoView(
+                        _remoteRenderer,
+                        objectFit:
+                            webrtc
+                                .RTCVideoViewObjectFit
+                                .RTCVideoViewObjectFitCover,
+                      ),
                     ),
 
                     // Local Video (Small)
@@ -210,6 +221,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         child: webrtc.RTCVideoView(
                           _localRenderer,
                           mirror: true,
+                          objectFit:
+                              webrtc
+                                  .RTCVideoViewObjectFit
+                                  .RTCVideoViewObjectFitCover,
                         ),
                       ),
                     ),
@@ -251,7 +266,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       onPressed: () {
                         setState(() {
                           isAudioOn = !isAudioOn;
-                          _callController.localStream?.getAudioTracks().first.enabled = isAudioOn;
+                          _callController
+                              .localStream
+                              ?.getAudioTracks()
+                              .first
+                              .enabled = isAudioOn;
                         });
                       },
                     ),
@@ -266,7 +285,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       onPressed: () {
                         setState(() {
                           isVideoOn = !isVideoOn;
-                          _callController.localStream?.getVideoTracks().first.enabled = isVideoOn;
+                          _callController
+                              .localStream
+                              ?.getVideoTracks()
+                              .first
+                              .enabled = isVideoOn;
                         });
                       },
                     ),

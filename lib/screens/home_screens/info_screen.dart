@@ -159,7 +159,7 @@ class InfoScreen extends StatelessWidget {
                         Get.to(
                           () => ChatMsgsScreen(),
                           arguments: {
-                            'chatId': chatId,
+                            'receiverId': contact.id,
                             'contactName': contact.name,
                           },
                         );

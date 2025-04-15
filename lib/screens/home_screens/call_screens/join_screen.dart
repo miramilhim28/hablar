@@ -12,7 +12,7 @@ class JoinScreen extends StatefulWidget {
   final String calleeId;
   final String callType;
 
-  JoinScreen({
+  const JoinScreen({
     super.key,
     required this.callerId,
     required this.calleeId,
@@ -40,7 +40,7 @@ class _JoinScreenState extends State<JoinScreen> {
 
   try {
     String roomId = await callController.createRoom();
-    print("Room Created: $roomId");
+    print("✅ Room Created: $roomId");
 
     await Future.delayed(Duration(seconds: 1));
 
@@ -50,6 +50,7 @@ class _JoinScreenState extends State<JoinScreen> {
       throw Exception("Local SDP offer is null.");
     }
 
+    // Save call details in Firestore
     await FirebaseFirestore.instance.collection('calls').doc(roomId).set({
       'callId': roomId,
       'callerId': widget.callerId,
@@ -59,6 +60,19 @@ class _JoinScreenState extends State<JoinScreen> {
       'offer': {'sdp': offerSDP.sdp, 'type': offerSDP.type},
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    print("✅ Call saved in Firestore.");
+
+    // Notify callee to trigger incoming call screen
+    FirebaseFirestore.instance.collection('users').doc(widget.calleeId).update({
+      'incomingCall': {
+        'callId': roomId,
+        'callerId': widget.callerId,
+        'callType': widget.callType,
+      }
+    });
+
+    print("✅ Incoming call notification sent to callee.");
 
     _listenForAnswer(roomId);
   } catch (e) {
@@ -72,39 +86,57 @@ class _JoinScreenState extends State<JoinScreen> {
 
 
 
+
+
   void _listenForAnswer(String roomId) {
-  FirebaseFirestore.instance.collection('calls').doc(roomId).snapshots().listen((snapshot) async {
-    if (snapshot.exists) {
-      var roomData = snapshot.data() as Map<String, dynamic>;
+  FirebaseFirestore.instance.collection('calls').doc(roomId).snapshots().listen(
+    (snapshot) async {
+      if (snapshot.exists) {
+        var roomData = snapshot.data() as Map<String, dynamic>;
 
-      if (roomData.containsKey('answer')) {
-        print("Call Answered! Setting Remote SDP...");
+        if (roomData.containsKey('answer')) {
+          print("✅ Call Answered! Setting Remote SDP...");
 
-        RTCSessionDescription answerSDP = RTCSessionDescription(
-          roomData['answer']['sdp'],
-          roomData['answer']['type'],
-        );
+          RTCSessionDescription answerSDP = RTCSessionDescription(
+            roomData['answer']['sdp'],
+            roomData['answer']['type'],
+          );
 
-        await callController.peerConnection?.setRemoteDescription(answerSDP);
+          // Check if PeerConnection is stable before setting remote description
+          if (callController.peerConnection!.signalingState == RTCSignalingState.RTCSignalingStateStable) {
+            print("⚠️ PeerConnection is already in stable state. Skipping setRemoteDescription.");
+            return;
+          }
 
-        //navigate to correct call screen
-        if (widget.callType == "video") {
-          Get.off(() => VideoCallScreen(
-                callerId: widget.callerId,
-                calleeId: widget.calleeId,
-                callId: roomId,
-              ));
-        } else {
-          Get.off(() => AudioCallScreen(
-                callerId: widget.callerId,
-                calleeId: widget.calleeId,
-                callId: roomId,
-              ));
+          await callController.peerConnection?.setRemoteDescription(answerSDP);
+
+          print("✅ Remote SDP Set Successfully!");
+
+          // Navigate to correct call screen
+          if (widget.callType == "video") {
+            Get.off(() => VideoCallScreen(
+                  callerId: widget.callerId,
+                  calleeId: widget.calleeId,
+                  callId: roomId,
+                ));
+          } else {
+            Get.off(() => AudioCallScreen(
+                  callerId: widget.callerId,
+                  calleeId: widget.calleeId,
+                  callId: roomId,
+                ));
+          }
         }
       }
-    }
-  });
+    },
+    onError: (error) {
+      print("❌ Error listening for answer: $error");
+    },
+  );
 }
+
+
+
 
 
   @override

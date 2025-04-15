@@ -1,21 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/controllers/home_controller.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
-class LandingScreen extends StatelessWidget {
-  LandingScreen({super.key});
+class LandingScreen extends StatefulWidget {
+  const LandingScreen({super.key});
 
+  @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
   final HomeController controller = Get.put(HomeController());
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final callController = Get.find<CallSignallingController>();
+      callController.listenForIncomingCalls(user.uid);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: 
-      GetBuilder<HomeController>(
+      body: GetBuilder<HomeController>(
         builder: (controller) => controller.pages[controller.selectedIndex],
       ),
-
       bottomNavigationBar: GetBuilder<HomeController>(
         builder: (controller) {
           return BottomNavigationBar(

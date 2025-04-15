@@ -6,6 +6,7 @@ import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/screens/home_screens/call_screens/audio_call_screen.dart';
 import 'package:hablar_clone/screens/home_screens/call_screens/video_call_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
+import 'package:audioplayers/audioplayers.dart';
 
 class IncomingCallScreen extends StatefulWidget {
   final String callId;
@@ -27,11 +28,32 @@ class IncomingCallScreen extends StatefulWidget {
 class _IncomingCallScreenState extends State<IncomingCallScreen> {
   final CallSignallingController controller = Get.find<CallSignallingController>();
   String callerName = "Fetching...";
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
     _fetchCallerName(); 
+    _playRingtone();
+  }
+
+   Future<void> _playRingtone() async {
+    try {
+      await _audioPlayer.play(AssetSource('audio/ringtone.mp3.m4a'), volume: 1.0);
+      _audioPlayer.setReleaseMode(ReleaseMode.loop); // loop the ringtone
+      await _audioPlayer.resume(); 
+      print("🔔 Ringtone playing...");
+    } catch (e) {
+      print("❌ Error playing ringtone: $e");
+    }
+  }
+
+  Future<void> _stopRingtone() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      print("❌ Error stopping ringtone: $e");
+    }
   }
 
   Future<void> _fetchCallerName() async {
@@ -116,6 +138,13 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     } catch (e) {
       Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
     }
+  }
+
+  @override
+  void dispose() {
+    _stopRingtone(); 
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   @override

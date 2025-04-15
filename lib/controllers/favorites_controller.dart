@@ -69,7 +69,7 @@ class FavoritesController extends GetxController {
         favorites.add(contact);
       }
 
-      favorites.refresh(); // Update UI
+      favorites.refresh(); 
     } catch (e) {
       print("Error updating favorites: $e");
     }

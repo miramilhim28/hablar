@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:hablar_clone/screens/home_screens/recents_screen.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/recents_screen.dart';
 import 'package:hablar_clone/screens/home_screens/chat_screens/chats_screen.dart';
 import 'package:hablar_clone/screens/home_screens/contacts_screen.dart';
 import 'package:hablar_clone/screens/home_screens/favorites_screen.dart';

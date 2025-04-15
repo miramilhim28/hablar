@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:hablar_clone/controllers/chats_controller.dart';
 import 'package:hablar_clone/models/message.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/join_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class ChatMsgsScreen extends StatelessWidget {
@@ -14,11 +17,32 @@ class ChatMsgsScreen extends StatelessWidget {
 
   ChatMsgsScreen({super.key});
 
+  String formatTime(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return DateFormat('h:mm a').format(date);
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return DateFormat('EEEE').format(date);
+    } else {
+      return DateFormat('dd/MM/yyyy').format(date);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    String chatId = chatData['chatId'];
-    String contactName = chatData['contactName'];
-    String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final String receiverId = chatData['receiverId'];
+    final String receiverName = chatData['contactName'];
+    final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    final List<String> ids = [currentUserId, receiverId]..sort();
+    final String chatId = ids.join('_');
+    _clearUnreadCount(chatId, currentUserId);
+
 
     return Scaffold(
       appBar: AppBar(
@@ -32,13 +56,16 @@ class ChatMsgsScreen extends StatelessWidget {
             CircleAvatar(
               backgroundColor: utils.pinkLilac,
               child: Text(
-                contactName[0],
-                style: TextStyle(color: utils.darkGrey, fontWeight: FontWeight.bold),
+                receiverName[0],
+                style: TextStyle(
+                  color: utils.darkGrey,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 10),
             Text(
-              contactName,
+              receiverName,
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.bold,
@@ -47,11 +74,29 @@ class ChatMsgsScreen extends StatelessWidget {
             ),
           ],
         ),
-        actions: const [
-          Icon(Icons.call, color: utils.pinkLilac),
-          SizedBox(width: 16),
-          Icon(Icons.videocam, color: utils.pinkLilac),
-          SizedBox(width: 16),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call, color: utils.pinkLilac),
+            onPressed: () {
+              Get.to(() => JoinScreen(
+                    callerId: currentUserId,
+                    calleeId: receiverId,
+                    callType: "audio",
+                  ));
+            },
+          ),
+          const SizedBox(width: 16),
+          IconButton(
+            icon: const Icon(Icons.videocam, color: utils.pinkLilac),
+            onPressed: () {
+              Get.to(() => JoinScreen(
+                    callerId: currentUserId,
+                    calleeId: receiverId,
+                    callType: "video",
+                  ));
+            },
+          ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Container(
@@ -68,33 +113,83 @@ class ChatMsgsScreen extends StatelessWidget {
               child: StreamBuilder<List<Message>>(
                 stream: controller.getMessages(chatId),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator());
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(child: Text("📭 No messages yet"));
                   }
 
-                  var messages = snapshot.data!;
+                  final messages = snapshot.data!;
+
+                  _markDeliveredAndRead(chatId, messages, currentUserId);
+
                   return ListView.builder(
                     controller: scrollController,
                     reverse: true,
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final message = messages[index];
-                      bool isSentByMe = message.senderId == currentUserId;
-                      Color bubbleColor = isSentByMe ? utils.darkPurple : utils.purpleLilac;
-                      Color textColor = isSentByMe ? utils.white : utils.darkGrey;
+                      final isSentByMe = message.senderId == currentUserId;
+
+                      String tick = "";
+                      if (isSentByMe) {
+                        if (message.readBy.contains(receiverId)) {
+                          tick = "✔️✔️";
+                        } else {
+                          tick = "✔️";
+                        }
+                      }
+
+                      final bubbleColor =
+                          isSentByMe ? utils.darkPurple : utils.purpleLilac;
+                      final textColor =
+                          isSentByMe ? utils.white : utils.darkGrey;
 
                       return Align(
-                        alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
+                        alignment: isSentByMe
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
                         child: Container(
-                          padding: EdgeInsets.all(12),
-                          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.symmetric(
+                              vertical: 4, horizontal: 12),
                           decoration: BoxDecoration(
                             color: bubbleColor,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Text(
-                            message.text,
-                            style: TextStyle(color: textColor),
+                          child: Column(
+                            crossAxisAlignment: isSentByMe
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      message.text,
+                                      style: TextStyle(color: textColor),
+                                    ),
+                                  ),
+                                  if (isSentByMe) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      tick,
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                formatTime(message.timestamp),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: textColor.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -103,16 +198,21 @@ class ChatMsgsScreen extends StatelessWidget {
                 },
               ),
             ),
-            _buildMessageInput(chatId, currentUserId),
+            _buildMessageInput(chatId, currentUserId, receiverId, receiverName),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMessageInput(String chatId, String currentUserId) {
+  Widget _buildMessageInput(
+    String chatId,
+    String senderId,
+    String receiverId,
+    String receiverName,
+  ) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: utils.darkGrey,
       child: Row(
         children: [
@@ -127,7 +227,7 @@ class ChatMsgsScreen extends StatelessWidget {
               ),
               child: TextField(
                 controller: messageController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Type a message',
                   hintStyle: TextStyle(color: Colors.blueGrey),
@@ -140,8 +240,13 @@ class ChatMsgsScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.send, color: utils.pinkLilac),
             onPressed: () {
-              if (messageController.text.trim().isNotEmpty) { 
-                controller.sendMessage(chatId, currentUserId, messageController.text.trim());
+              if (messageController.text.trim().isNotEmpty) {
+                controller.sendMessage(
+                  senderId,
+                  receiverId,
+                  receiverName,
+                  messageController.text.trim(),
+                );
                 messageController.clear();
                 _scrollToBottom();
               }
@@ -153,12 +258,46 @@ class ChatMsgsScreen extends StatelessWidget {
   }
 
   void _scrollToBottom() {
-    Future.delayed(Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       scrollController.animateTo(
         scrollController.position.minScrollExtent,
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
     });
+  }
+  void _clearUnreadCount(String chatId, String userId) async {
+  final unreadRef = FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .collection('unread')
+      .doc(chatId);
+
+  await unreadRef.set({'count': 0});
+}
+
+
+  void _markDeliveredAndRead(
+      String chatId, List<Message> messages, String currentUserId) async {
+    final batch = FirebaseFirestore.instance.batch();
+    final chatRef = FirebaseFirestore.instance.collection('chats').doc(chatId);
+
+    for (final msg in messages) {
+      final msgRef = chatRef.collection('messages').doc(msg.id);
+
+      if (!msg.deliveredTo.contains(currentUserId)) {
+        batch.update(msgRef, {
+          'deliveredTo': FieldValue.arrayUnion([currentUserId]),
+        });
+      }
+
+      if (!msg.readBy.contains(currentUserId)) {
+        batch.update(msgRef, {
+          'readBy': FieldValue.arrayUnion([currentUserId]),
+        });
+      }
+    }
+
+    await batch.commit();
   }
 }

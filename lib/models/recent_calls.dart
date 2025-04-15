@@ -1,7 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 class RecentCalls {
   String name;
   final String callType;
-  final String callTime;
+  final DateTime callTime;
   final bool isMissed;
   final String callerId;
   final String calleeId;
@@ -16,10 +17,11 @@ class RecentCalls {
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'callType': callType,
-        'callTime': callTime,
-        'callerId': callerId,
-        'calleeId': calleeId,
-      };
+  'name': name,
+  'callType': callType,
+  'timestamp': Timestamp.fromDate(callTime), 
+  'callerId': callerId,
+  'calleeId': calleeId,
+};
+
 }

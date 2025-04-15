@@ -1,12 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 import 'package:hablar_clone/controllers/recents_controller.dart';
+import 'package:hablar_clone/models/recent_calls.dart';
+import 'package:hablar_clone/screens/home_screens/call_screens/join_screen.dart';
 
 class CallsScreen extends StatelessWidget {
   final CallsController controller = Get.put(CallsController());
 
   CallsScreen({super.key});
+
+  String formatCallTime(DateTime callTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final callDay = DateTime(callTime.year, callTime.month, callTime.day);
+    final difference = today.difference(callDay).inDays;
+
+    if (difference == 0) {
+      return DateFormat('h:mm a').format(callTime);
+    } else if (difference < 7) {
+      return DateFormat('EEEE').format(callTime);
+    } else {
+      return DateFormat('dd/MM/yyyy').format(callTime);
+    }
+  }
+
+  void _recallCall(RecentCalls call) {
+    Get.to(() => JoinScreen(
+          callerId: FirebaseAuth.instance.currentUser!.uid,
+          calleeId: call.callerId == FirebaseAuth.instance.currentUser!.uid
+              ? call.calleeId
+              : call.callerId,
+          callType: call.callType,
+        ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,12 +46,11 @@ class CallsScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [utils.purpleLilac, utils.white],
+            colors: [utils.purpleLilac, Colors.white],
           ),
         ),
         child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -37,7 +66,6 @@ class CallsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -101,7 +129,6 @@ class CallsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -120,54 +147,84 @@ class CallsScreen extends StatelessWidget {
                         : ListView.builder(
                             itemCount: controller.filteredCalls.length,
                             itemBuilder: (context, index) {
-                              final call = controller.filteredCalls[index];
-                              return Column(
-                                children: [
-                                  ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: utils.pinkLilac,
-                                      child: Text(call.name.isNotEmpty
-                                          ? call.name[0]
-                                          : '?'), 
-                                    ),
-                                    title: Text(
-                                      call.name,
+                              final RecentCalls call = controller.filteredCalls[index];
+                              return Dismissible(
+                                key: ValueKey(call.hashCode),
+                                background: Container(
+                                  color: Colors.green,
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.only(left: 20),
+                                  child: Icon(
+                                    call.callType == "video" ? Icons.videocam : Icons.call,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                secondaryBackground: Container(
+                                  color: Colors.red,
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  child: const Icon(Icons.delete, color: Colors.white),
+                                ),
+                                confirmDismiss: (direction) async {
+                                  if (direction == DismissDirection.startToEnd) {
+                                    _recallCall(call);
+                                    return false;
+                                  } else if (direction == DismissDirection.endToStart) {
+                                    await controller.deleteCall(call);
+                                    return true;
+                                  }
+                                  return false;
+                                },
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                                  leading: CircleAvatar(
+                                    backgroundColor: utils.pinkLilac,
+                                    child: Text(
+                                      call.name.isNotEmpty ? call.name[0] : '?',
                                       style: TextStyle(
-                                        color: call.isMissed ? Colors.red : utils.darkGrey,
                                         fontFamily: 'Poppins',
                                         fontWeight: FontWeight.bold,
+                                        color: utils.darkGrey,
                                       ),
                                     ),
-                                    subtitle: Row(
-                                      children: [
-                                        Icon(
-                                          call.callType == "audio"
-                                              ? Icons.call
-                                              : Icons.videocam,
-                                          size: 16,
-                                          color: call.isMissed ? Colors.red : utils.darkGrey,
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          call.callType.capitalizeFirst!,
-                                          style: TextStyle(color: utils.darkGrey),
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Text(
-                                      call.callTime,
-                                      style: TextStyle(color: utils.darkGrey),
+                                  ),
+                                  title: Text(
+                                    call.name,
+                                    style: TextStyle(
+                                      color: call.isMissed ? Colors.red : utils.darkGrey,
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  Divider(thickness: 1, color: utils.darkGrey),
-                                ],
+                                  subtitle: Row(
+                                    children: [
+                                      Icon(
+                                        call.callType == "audio" ? Icons.call : Icons.videocam,
+                                        size: 16,
+                                        color: call.isMissed ? Colors.red : utils.darkGrey,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        call.callType.capitalizeFirst!,
+                                        style: TextStyle(color: utils.darkGrey),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: Text(
+                                    formatCallTime(call.callTime),
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: utils.darkGrey,
+                                    ),
+                                  ),
+                                ),
                               );
                             },
-                          ),
                   ),
                 ),
               ),
-            ],
+          )],
           ),
         ),
       ),
