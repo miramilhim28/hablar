@@ -63,7 +63,7 @@ class CallSignallingController extends GetxController {
     await _remoteAudioRenderer!.initialize();
 
     // ✅ Stream Handling
-    /*peerConnection?.onTrack = (event) {
+    peerConnection?.onTrack = (event) {
       if (event.streams.isNotEmpty) {
         remoteStream.value = event.streams.first;
         print("📥 Track received: ${event.track.kind}");
@@ -76,7 +76,7 @@ class CallSignallingController extends GetxController {
       } else {
         print("⚠️ Track received without stream");
       }
-    };*/
+    };
 
     print("✅ Peer Connection Initialized!");
   }
@@ -166,6 +166,10 @@ class CallSignallingController extends GetxController {
   // Join an existing room (SDP answer)
   Future<void> joinRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
     await openUserMedia(video: true);
+// 🐛 DEBUG: Log all local tracks after getUserMedia
+    localStream?.getTracks().forEach((track) {
+      print("📤 Local track (callee): kind=${track.kind}, enabled=${track.enabled}");
+    });
 
     FirebaseFirestore db = FirebaseFirestore.instance;
     DocumentReference roomRef = db.collection('calls').doc(roomId);
@@ -173,7 +177,9 @@ class CallSignallingController extends GetxController {
 
     if (roomSnapshot.exists) {
       peerConnection ??= await createPeerConnection(configuration);
-      registerPeerConnectionListeners();
+      registerPeerConnectionListeners(
+        remoteRenderer: remoteRenderer,
+      ); // ✅ pass renderer here
 
       // Add local tracks
       if (localStream != null) {
@@ -185,51 +191,24 @@ class CallSignallingController extends GetxController {
       var data = roomSnapshot.data() as Map<String, dynamic>;
       var offer = data['offer'];
 
-      // ✅ Make sure this completes successfully
+      // ✅ Set remote description from caller
       await peerConnection!.setRemoteDescription(
         RTCSessionDescription(offer['sdp'], offer['type']),
       );
       print("✅ Remote description set!");
 
-      // ✅ Now it's safe to create the answer
+      // ✅ Create answer
       final answer = await peerConnection!.createAnswer({
         'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
         'optional': [],
       });
 
       await peerConnection!.setLocalDescription(answer);
-
-      print("✅ Answer SDP Generated: ${answer.sdp}");
+      print("✅ Answer SDP Generated: \${answer.sdp}");
 
       await roomRef.update({
         'answer': {'type': answer.type, 'sdp': answer.sdp},
       });
-
-      peerConnection?.onTrack = (event) {
-        if (event.streams.isNotEmpty) {
-          final remote = event.streams.first;
-
-          remoteStream.value = remote;
-          remoteRenderer.srcObject = remote;
-
-          print("✅ Remote stream assigned to renderer");
-
-          remote.getVideoTracks().forEach((track) {
-            print(
-              "🎥 Remote video track: ${track.id}, enabled: ${track.enabled}",
-            );
-          });
-
-          remote.getAudioTracks().forEach((track) {
-            track.enabled = true;
-            print(
-              "🔊 Remote audio track: ${track.id}, enabled: ${track.enabled}",
-            );
-          });
-        } else {
-          print("⚠️ Received track without stream.");
-        }
-      };
     }
   }
 
@@ -390,17 +369,21 @@ class CallSignallingController extends GetxController {
     peerConnection?.close();
   }
 
-  void registerPeerConnectionListeners() {
+  void registerPeerConnectionListeners({RTCVideoRenderer? remoteRenderer}) {
     peerConnection?.onTrack = (event) {
-      print("📥 Track received: ${event.track.kind}, ID: ${event.track.id}");
+      print("📥 Track received: \${event.track.kind}, ID: \${event.track.id}");
 
       if (event.streams.isNotEmpty) {
         final stream = event.streams.first;
         remoteStream.value = stream;
 
+        if (remoteRenderer != null) {
+          remoteRenderer.srcObject = stream;
+          print("✅ Renderer assigned in onTrack");
+        }
+
         if (event.track.kind == 'video') {
           print("🎥 Remote video track received!");
-          _remoteAudioRenderer?.srcObject = stream;
         }
 
         if (event.track.kind == 'audio') {
@@ -412,15 +395,15 @@ class CallSignallingController extends GetxController {
     };
 
     peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
-      print('ICE gathering state changed: $state');
+      print('ICE gathering state changed: \$state');
     };
 
     peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
-      print('Connection state changed: $state');
+      print('Connection state changed: \$state');
     };
 
     peerConnection?.onSignalingState = (RTCSignalingState state) {
-      print('Signaling state changed: $state');
+      print('Signaling state changed: \$state');
     };
   }
 }

@@ -170,7 +170,7 @@ class _JoinScreenState extends State<JoinScreen> {
                   color: utils.darkGrey,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 250),
               ElevatedButton.icon(
                 onPressed: _cancelCall,
                 icon: const Icon(Icons.call_end, color: Colors.white),

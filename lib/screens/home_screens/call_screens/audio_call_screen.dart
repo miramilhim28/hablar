@@ -44,29 +44,27 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
 
   //initialize WebRTC sudio call
   Future<void> _initializeAudioCall() async {
-  try {
-    await _callController.initializePeerConnection();
+    try {
+      await _callController.initializePeerConnection();
 
-    _callController.localStream = await webrtc.navigator.mediaDevices
-        .getUserMedia({'audio': true, 'video': false});
+      _callController.localStream = await webrtc.navigator.mediaDevices
+          .getUserMedia({'audio': true, 'video': false});
 
-    _callController.localStream!.getAudioTracks().forEach((track) {
-      track.enabled = true;
-      print("🎙 Local Audio Enabled: ${track.label}");
-    });
+      _callController.localStream!.getAudioTracks().forEach((track) {
+        track.enabled = true;
+        print("🎙 Local Audio Enabled: ${track.label}");
+      });
 
-    // ✅ Setup & store renderer early
-    _remoteAudioRenderer = webrtc.RTCVideoRenderer();
-    await _remoteAudioRenderer!.initialize();
-    await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
-
-    // ✅ Join room and attach remote audio to renderer in joinRoom
-    await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
-  } catch (e) {
-    print("❌ Error initializing audio call: $e");
+      // ✅ Setup & store renderer early
+      _remoteAudioRenderer = webrtc.RTCVideoRenderer();
+      await _remoteAudioRenderer!.initialize();
+      
+      // ✅ Join room and attach remote audio to renderer in joinRoom
+      await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
+    } catch (e) {
+      print("❌ Error initializing audio call: $e");
+    }
   }
-}
-
 
   //Listen for call status updates from firestore
   void _listenForCallStatus() {
@@ -109,7 +107,6 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
           }
         });
   }
-
 
   //Missed call
   void _startCallTimeout() {
