@@ -60,7 +60,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
     await _remoteAudioRenderer!.initialize();
     await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
 
-    // ✅ Join room and attach remote audio to renderer in `joinRoom`
+    // ✅ Join room and attach remote audio to renderer in joinRoom
     await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
   } catch (e) {
     print("❌ Error initializing audio call: $e");

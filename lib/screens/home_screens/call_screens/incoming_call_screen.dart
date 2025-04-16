@@ -18,7 +18,8 @@ class IncomingCallScreen extends StatefulWidget {
     required this.callId,
     required this.callerId,
     required this.calleeId,
-    required this.callType, required String callerName,
+    required this.callType,
+    required String callerName,
   });
 
   @override
@@ -35,16 +36,38 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     super.initState();
     _fetchCallerName(); 
     _playRingtone();
+    _listenForCallStatus();
   }
 
-   Future<void> _playRingtone() async {
+  void _listenForCallStatus() {
+    FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.callId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        final status = data['callStatus'];
+
+        if (status == 'missed' || status == 'ended' || status == 'declined') {
+          print("\ud83d\udcf4 Caller cancelled or ended the call. Closing screen.");
+          if (mounted) {
+            _stopRingtone();
+            Get.back();
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _playRingtone() async {
     try {
       await _audioPlayer.play(AssetSource('audio/ringtone.mp3.m4a'), volume: 1.0);
-      _audioPlayer.setReleaseMode(ReleaseMode.loop); // loop the ringtone
+      _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.resume(); 
-      print("🔔 Ringtone playing...");
+      print("\ud83d\udd14 Ringtone playing...");
     } catch (e) {
-      print("❌ Error playing ringtone: $e");
+      print("\u274c Error playing ringtone: \$e");
     }
   }
 
@@ -52,7 +75,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     try {
       await _audioPlayer.stop();
     } catch (e) {
-      print("❌ Error stopping ringtone: $e");
+      print("\u274c Error stopping ringtone: \$e");
     }
   }
 
@@ -73,7 +96,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
         });
       }
     } catch (e) {
-      print("Error fetching caller name: $e");
+      print("Error fetching caller name: \$e");
       setState(() {
         callerName = "Unknown Caller";
       });
@@ -96,19 +119,16 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       await remoteRenderer.initialize();
       await controller.joinRoom(widget.callId, remoteRenderer);
 
-      //SDP Answer
       RTCSessionDescription? answerSDP = await controller.peerConnection?.getLocalDescription();
       if (answerSDP == null) {
         throw Exception("Local SDP answer is null.");
       }
 
-      //Save the answer SDP in firestore
       await FirebaseFirestore.instance.collection('calls').doc(widget.callId).update({
         'answer': {'sdp': answerSDP.sdp, 'type': answerSDP.type},
         'callStatus': 'answered',
       });
 
-      //Navigate to call screen
       if (widget.callType == "video") {
         Get.off(() => VideoCallScreen(
               callerId: widget.callerId,
@@ -123,7 +143,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
             ));
       }
     } catch (e) {
-      Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
+      Get.snackbar("Error", "Failed to accept call: \${e.toString()}");
     }
   }
 
@@ -136,7 +156,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       controller.hangUp();
       Get.back();
     } catch (e) {
-      Get.snackbar("Error", "Failed to decline call: ${e.toString()}");
+      Get.snackbar("Error", "Failed to decline call: \${e.toString()}");
     }
   }
 
@@ -172,13 +192,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Accept Call Button
                 IconButton(
                   icon: const Icon(Icons.call, color: Colors.green, size: 50),
                   onPressed: _acceptCall,
                 ),
                 const SizedBox(width: 50),
-                // Decline Call Button
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
                   onPressed: _declineCall,
