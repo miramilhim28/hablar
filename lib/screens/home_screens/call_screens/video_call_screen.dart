@@ -56,7 +56,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  //Initialize WebRTC video call
   void _initializeVideoCall() async {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
@@ -76,67 +75,57 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     print("🎥 Local video tracks:");
     _callController.localStream?.getVideoTracks().forEach((track) {
-      print("Track ID: \${track.id}, Enabled: \${track.enabled}");
+      print("Track ID: ${track.id}, Enabled: ${track.enabled}");
     });
   }
 
-  //Listen for call Status Changes in firestore
   void _listenForCallStatus() {
     FirebaseFirestore.instance
         .collection('calls')
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-          if (snapshot.exists) {
-            String status = snapshot['callStatus'] ?? 'calling';
-            print("CALL STATUS: \$status");
+      if (snapshot.exists) {
+        String status = snapshot['callStatus'] ?? 'calling';
+        print("CALL STATUS: $status");
 
-            if (status == 'answered' && !isAnswered) {
-              _timeoutTimer?.cancel();
-              setState(() {
-                isAnswered = true;
-              });
-              print("Call was answered! Starting timer...");
-              _startCallTimer();
-            }
+        if (status == 'answered' && !isAnswered) {
+          _timeoutTimer?.cancel();
+          setState(() {
+            isAnswered = true;
+          });
+          print("Call was answered! Starting timer...");
+          _startCallTimer();
+        }
 
-            if (_callController.remoteStream.value != null) {
-              if (_callController.remoteStream.value != null) {
-              print("🔊 Ensuring Remote Audio is Active...");
-              _callController.remoteStream.value?.getAudioTracks().forEach((track) {
-                track.enabled = true;
-              });
+        if (_callController.remoteStream.value != null) {
+          print("🔊 Ensuring Remote Audio is Active...");
+          _callController.remoteStream.value?.getAudioTracks().forEach((track) {
+            track.enabled = true;
+          });
 
-              // ✅ Assign remote stream to the renderer if not already assigned
-              
-              // 🐛 DEBUG: Print all remote tracks
-              _callController.remoteStream.value?.getTracks().forEach((track) {
-                print("📺 Remote track: kind=${track.kind}, enabled=${track.enabled}");
-              });
+          // 🐛 DEBUG: Print all remote tracks
+          _callController.remoteStream.value?.getTracks().forEach((track) {
+            print("📺 Remote track: kind=${track.kind}, enabled=${track.enabled}");
+          });
 
-              _callController.remoteStream.value?.getVideoTracks().forEach((track) {
-                print("🎥 Remote video track: ${track.id}, enabled: ${track.enabled}");
-                track.enabled = true; // Force-enable
-              });
+          _callController.remoteStream.value?.getVideoTracks().forEach((track) {
+            print("🎥 Remote video track: ${track.id}, enabled: ${track.enabled}");
+            track.enabled = true;
+          });
 
-              if (_remoteRenderer.srcObject == null) {
-                _remoteRenderer.srcObject = _callController.remoteStream.value;
-                print("🎥 Remote stream assigned to renderer.");
-              }
-            }
-              _callController.remoteStream.value?.getAudioTracks().forEach((track) {
-                track.enabled = true;
-              });
-            }
+          // ✅ Force assign every time
+          _remoteRenderer.srcObject = _callController.remoteStream.value;
+          print("🎥 [FORCED] Remote stream assigned to renderer.");
+        }
 
-            if ((status == 'ended' || status == 'missed') && !isCallEnded) {
-              _endCall();
-            }
-          }
-        });
+        if ((status == 'ended' || status == 'missed') && !isCallEnded) {
+          _endCall();
+        }
+      }
+    });
   }
 
-  //automatically End Call If No Answer After 15 Seconds
   void _startCallTimeout() {
     _timeoutTimer = Timer(const Duration(seconds: 15), () async {
       DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
@@ -157,7 +146,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     });
   }
 
-  //end call and close the call screen
   Future<void> _endCall() async {
     if (!isCallEnded) {
       setState(() {
@@ -197,7 +185,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Remote Video (Big)
                     Container(
                       width: double.infinity,
                       height: double.infinity,
@@ -207,8 +194,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         objectFit: webrtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                       ),
                     ),
-
-                    // Local Video (Small)
                     Positioned(
                       top: 20,
                       right: 20,
@@ -226,8 +211,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         ),
                       ),
                     ),
-
-                    // Call Status
                     Positioned(
                       top: 40,
                       child: Column(
@@ -246,8 +229,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   ],
                 ),
               ),
-
-              // Call Controls
               Container(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 color: Colors.black,
@@ -267,7 +248,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         });
                       },
                     ),
-
                     IconButton(
                       icon: Icon(
                         isVideoOn ? Icons.videocam : Icons.videocam_off,
@@ -281,7 +261,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         });
                       },
                     ),
-
                     IconButton(
                       icon: Icon(Icons.call_end, color: Colors.red, size: 40),
                       onPressed: _endCall,
