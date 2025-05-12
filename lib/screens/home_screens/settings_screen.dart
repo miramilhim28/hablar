@@ -46,9 +46,6 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  Icon(Icons.person, color: utils.darkPurple, size: 100),
 
                   const SizedBox(height: 16),
 

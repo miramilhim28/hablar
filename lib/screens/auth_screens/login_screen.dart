@@ -6,7 +6,7 @@ import 'package:get/get.dart';
 
 class LoginScreen extends StatelessWidget {
   LoginScreen({super.key});
-  final AuthController _loginController = Get.put(AuthController());
+  final AuthController _loginController = Get.find<AuthController>();
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +39,7 @@ class LoginScreen extends StatelessWidget {
             ),
             const SizedBox(height: 50),
 
-            //text field input for email:
+            // Email
             SizedBox(
               width: 300,
               height: 50,
@@ -59,7 +59,7 @@ class LoginScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            //text field input for Password:
+            // Password
             SizedBox(
               width: 300,
               height: 50,
@@ -79,51 +79,45 @@ class LoginScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            //LogIn Button:
+            // Log In Button
             Obx(() => ElevatedButton(
-                onPressed: _loginController.isLoading.value
-                    ? null
-                    : _loginController.loginUser,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: utils.darkPurple,
-                  foregroundColor: utils.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+              onPressed: _loginController.isLoading.value ? null : _loginController.loginUser,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: utils.darkPurple,
+                foregroundColor: utils.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                padding: const EdgeInsets.all(14),
+              ),
+              child: _loginController.isLoading.value
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: utils.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      color: utils.white,
+                    ),
                   ),
-                  padding:
-                      const EdgeInsets.all(14),
-                ),
-                child: _loginController.isLoading.value
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: utils.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                          color: utils.white,
-                        ),
-                      ))),
+            )),
             const SizedBox(height: 24),
 
-            //Sign Up Link
+            // Sign Up Link
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
                   "Don't have an account? ",
-                  style:
-                      TextStyle(color: utils.darkGrey, fontFamily: 'Poppins'),
+                  style: TextStyle(color: utils.darkGrey, fontFamily: 'Poppins'),
                 ),
                 GestureDetector(
-                  onTap: () =>
-                      Get.to(() => SignupScreen()),
+                  onTap: () => Get.to(() => SignupScreen()),
                   child: const Text(
                     'Sign Up',
                     style: TextStyle(

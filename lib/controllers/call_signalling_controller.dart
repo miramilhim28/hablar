@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:get/get.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hablar_clone/screens/home_screens/call_screens/audio_call_screen.dart';
 import 'package:hablar_clone/screens/home_screens/call_screens/video_call_screen.dart';
@@ -21,7 +21,6 @@ class CallSignallingController extends GetxController {
   };
 
   RTCPeerConnection? peerConnection;
-  webrtc.RTCVideoRenderer? _remoteAudioRenderer;
   MediaStream? localStream;
   Rx<MediaStream?> remoteStream = Rx<MediaStream?>(null);
   RxBool isCallActive = false.obs;
@@ -30,58 +29,23 @@ class CallSignallingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    initializePeerConnection();
-
     String? userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      listenForIncomingCalls(userId);
+    if (userId != null) listenForIncomingCalls(userId);
+  }
+
+  Future<void> initializePeerConnection({
+    RTCVideoRenderer? remoteRenderer,
+  }) async {
+    peerConnection = await createPeerConnection(configuration);
+    registerPeerConnectionListeners(remoteRenderer: remoteRenderer);
+
+    if (localStream != null) {
+      for (var track in localStream!.getTracks()) {
+        peerConnection?.addTrack(track, localStream!);
+      }
     }
   }
 
-  /// **Initialize WebRTC Peer Connection**
-  Future<void> initializePeerConnection() async {
-    peerConnection = await createPeerConnection(configuration);
-
-    // ✅ ICE Candidate Debug
-    peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
-      print("🧊 ICE Candidate: ${candidate.candidate}");
-
-      FirebaseFirestore.instance
-          .collection('rooms')
-          .doc(roomId)
-          .collection('candidates')
-          .add(candidate.toMap());
-    };
-
-    // ✅ ICE Connection State Debug
-    peerConnection!.onIceConnectionState = (RTCIceConnectionState state) {
-      print("🔄 ICE State: $state");
-    };
-
-    // ✅ Setup & store renderer early
-    _remoteAudioRenderer = webrtc.RTCVideoRenderer();
-    await _remoteAudioRenderer!.initialize();
-
-    // ✅ Stream Handling
-    peerConnection?.onTrack = (event) {
-      if (event.streams.isNotEmpty) {
-        remoteStream.value = event.streams.first;
-        print("📥 Track received: ${event.track.kind}");
-
-        if (event.track.kind == 'video') {
-          print("🎥 Remote video track received");
-        } else if (event.track.kind == 'audio') {
-          print("🔊 Remote audio track received");
-        }
-      } else {
-        print("⚠️ Track received without stream");
-      }
-    };
-
-    print("✅ Peer Connection Initialized!");
-  }
-
-  // Open user media
   Future<void> openUserMedia({bool video = false}) async {
     var micStatus = await Permission.microphone.request();
     var camStatus = await Permission.camera.request();
@@ -93,123 +57,98 @@ class CallSignallingController extends GetxController {
 
     localStream = await webrtc.navigator.mediaDevices.getUserMedia({
       'audio': true,
-      'video':
-          video
-              ? {
-                'facingMode': 'user',
-                'width': {'ideal': 1280},
-                'height': {'ideal': 720},
-              }
-              : false,
+      'video': video
+          ? {
+              'facingMode': 'user',
+              'width': {'ideal': 1280},
+              'height': {'ideal': 720},
+            }
+          : false,
     });
 
-    // Optional debug
     localStream?.getTracks().forEach((track) {
-      print("🎥 Local track: ${track.kind}, enabled: ${track.enabled}");
+      track.enabled = true;
     });
   }
 
-  //Create a room and store WebRTC Offer
   Future<String> createRoom() async {
-    await openUserMedia();
+    await openUserMedia(video: true);
+
+    localStream?.getAudioTracks().forEach((track) {
+      print("📤 Caller Audio Track: ID=${track.id}, ENABLED=${track.enabled}, MUTED=${track.muted}");
+    });
 
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('rooms').doc();
+    DocumentReference roomRef = db.collection('calls').doc();
+    roomId = roomRef.id;
 
-    peerConnection = await createPeerConnection(configuration);
-    registerPeerConnectionListeners();
+    await initializePeerConnection();
 
-    // Add local tracks
     if (localStream != null) {
       for (var track in localStream!.getTracks()) {
         peerConnection?.addTrack(track, localStream!);
       }
     }
 
-    // ✅ Create offer with media constraints
     final offer = await peerConnection!.createOffer({
       'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
       'optional': [],
     });
 
-    // ✅ Set local description
     await peerConnection!.setLocalDescription(offer);
 
-    // ✅ Store offer in Firestore
     await roomRef.set({
       'offer': {'sdp': offer.sdp, 'type': offer.type},
       'callStatus': 'calling',
     });
 
-    roomId = roomRef.id;
-
-    // ✅ Listen for the answer (callee response)
     roomRef.snapshots().listen((snapshot) async {
       if (!snapshot.exists) return;
       var data = snapshot.data() as Map<String, dynamic>;
-
-      if (peerConnection!.getRemoteDescription() == null &&
-          data['answer'] != null) {
+      if (peerConnection!.getRemoteDescription() == null && data['answer'] != null) {
         var answer = RTCSessionDescription(
           data['answer']['sdp'],
           data['answer']['type'],
         );
-
         await peerConnection!.setRemoteDescription(answer);
-        print("✅ Answer SDP Set Successfully");
       }
     });
 
     return roomId!;
   }
 
-  // Join an existing room (SDP answer)
-  Future<void> joinRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
+  Future<void> joinRoom(String callId, RTCVideoRenderer remoteRenderer) async {
     await openUserMedia(video: true);
-// 🐛 DEBUG: Log all local tracks after getUserMedia
-    localStream?.getTracks().forEach((track) {
-      print("📤 Local track (callee): kind=${track.kind}, enabled=${track.enabled}");
-    });
 
     FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('calls').doc(roomId);
+    DocumentReference roomRef = db.collection('calls').doc(callId);
     var roomSnapshot = await roomRef.get();
 
-    if (roomSnapshot.exists) {
-      peerConnection ??= await createPeerConnection(configuration);
-      registerPeerConnectionListeners(
-        remoteRenderer: remoteRenderer,
-      ); // ✅ pass renderer here
+    if (!roomSnapshot.exists) return;
 
-      // Add local tracks
-      if (localStream != null) {
-        for (var track in localStream!.getTracks()) {
-          peerConnection?.addTrack(track, localStream!);
-        }
+    await initializePeerConnection(remoteRenderer: remoteRenderer);
+
+    if (localStream != null) {
+      for (var track in localStream!.getTracks()) {
+        peerConnection?.addTrack(track, localStream!);
       }
-
-      var data = roomSnapshot.data() as Map<String, dynamic>;
-      var offer = data['offer'];
-
-      // ✅ Set remote description from caller
-      await peerConnection!.setRemoteDescription(
-        RTCSessionDescription(offer['sdp'], offer['type']),
-      );
-      print("✅ Remote description set!");
-
-      // ✅ Create answer
-      final answer = await peerConnection!.createAnswer({
-        'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
-        'optional': [],
-      });
-
-      await peerConnection!.setLocalDescription(answer);
-      print("✅ Answer SDP Generated: \${answer.sdp}");
-
-      await roomRef.update({
-        'answer': {'type': answer.type, 'sdp': answer.sdp},
-      });
     }
+
+    var data = roomSnapshot.data() as Map<String, dynamic>;
+    var offer = data['offer'];
+    await peerConnection!.setRemoteDescription(
+      RTCSessionDescription(offer['sdp'], offer['type']),
+    );
+
+    final answer = await peerConnection!.createAnswer({
+      'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
+      'optional': [],
+    });
+
+    await peerConnection!.setLocalDescription(answer);
+    await roomRef.update({
+      'answer': {'type': answer.type, 'sdp': answer.sdp},
+    });
   }
 
   void listenForIncomingCalls(String userId) {
@@ -217,129 +156,59 @@ class CallSignallingController extends GetxController {
         .collection('users')
         .doc(userId)
         .snapshots()
-        .listen(
-          (snapshot) {
-            if (snapshot.exists &&
-                snapshot.data()!.containsKey('incomingCall')) {
-              var callData = snapshot.data()!['incomingCall'];
-
-              String callId = callData['callId'];
-              String callerId = callData['callerId'];
-              String callType = callData['callType'];
-
-              print("📞 Incoming call detected for user $userId");
-
-              if (Get.currentRoute != '/IncomingCallScreen') {
-                print("📞 Navigating to Incoming Call Screen");
-
-                Get.to(
-                  () => IncomingCallScreen(
-                    callId: callId,
-                    callerId: callerId,
-                    calleeId: userId,
-                    callerName: "Caller",
-                    callType: callType,
-                  ),
-                );
-              }
-            }
-          },
-          onError: (error) {
-            print("❌ Error listening for incoming calls: $error");
-          },
-        );
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data()!.containsKey('incomingCall')) {
+        var callData = snapshot.data()!['incomingCall'];
+        Get.to(() => IncomingCallScreen(
+              callId: callData['callId'],
+              callerId: callData['callerId'],
+              calleeId: userId,
+              callerName: "Caller",
+              callType: callData['callType'],
+            ));
+      }
+    });
   }
 
   Future<void> acceptCall(String callId) async {
-    try {
-      RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
-      await remoteRenderer.initialize();
+    RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+    await remoteRenderer.initialize();
 
-      if (peerConnection == null) {
-        print("⚠️ Peer Connection is NULL, initializing...");
-        await initializePeerConnection();
-      }
+    await openUserMedia(video: true);
+    await joinRoom(callId, remoteRenderer);
 
-      if (localStream == null) {
-        print("⚠️ Local stream is NULL, opening user media...");
-        await openUserMedia();
-      }
+    var callSnapshot =
+        await FirebaseFirestore.instance.collection('calls').doc(callId).get();
+    var callData = callSnapshot.data() as Map<String, dynamic>;
 
-      DocumentSnapshot callSnapshot =
-          await FirebaseFirestore.instance
-              .collection('calls')
-              .doc(callId)
-              .get();
+    await FirebaseFirestore.instance.collection('calls').doc(callId).update({
+      'callStatus': 'answered',
+    });
 
-      if (!callSnapshot.exists) {
-        throw Exception("Call document not found in Firestore.");
-      }
+    if (remoteStream.value != null) {
+      remoteRenderer.srcObject = null;
+      remoteRenderer.srcObject = remoteStream.value;
+    }
 
-      var callData = callSnapshot.data() as Map<String, dynamic>;
-
-      // 🔹 Join room before setting SDP
-      await joinRoom(callId, remoteRenderer);
-
-      // 🔹 Check if PeerConnection is in 'stable' state
-      if (peerConnection!.signalingState ==
-          RTCSignalingState.RTCSignalingStateStable) {
-        print(
-          "✅ Peer Connection is already stable, skipping setRemoteDescription.",
-        );
-      } else {
-        // 🔹 Set Remote Description only if not stable
-        var answerSDP = RTCSessionDescription(
-          callData['answer']['sdp'],
-          callData['answer']['type'],
-        );
-
-        await peerConnection!.setRemoteDescription(answerSDP);
-        print("✅ Remote Description set successfully!");
-      }
-
-      // 🔹 Update Firestore call status to 'answered'
-      await FirebaseFirestore.instance.collection('calls').doc(callId).update({
-        'callStatus': 'answered',
-      });
-
-      // 🔹 Attach Remote Stream
-      if (remoteStream.value != null) {
-        remoteRenderer.srcObject = remoteStream.value;
-        print("✅ Remote Audio & Video Stream Attached!");
-      } else {
-        print("⚠️ Remote stream is NULL!");
-      }
-
-      // 🔹 Navigate to the appropriate screen
-      String callType = callData['callType'];
-      if (callType == "video") {
-        Get.off(
-          () => VideoCallScreen(
+    if (callData['callType'] == "video") {
+      Get.off(() => VideoCallScreen(
             callerId: callData['callerId'],
             calleeId: callData['calleeId'],
             callId: callId,
-          ),
-        );
-      } else {
-        Get.off(
-          () => AudioCallScreen(
+          ));
+    } else {
+      Get.off(() => AudioCallScreen(
             callerId: callData['callerId'],
             calleeId: callData['calleeId'],
             callId: callId,
-          ),
-        );
-      }
-    } catch (e) {
-      print("❌ Error in acceptCall: $e");
-      Get.snackbar("Error", "Failed to accept call: ${e.toString()}");
+          ));
     }
   }
 
   Future<void> declineCall(String callId) async {
-    await FirebaseFirestore.instance.collection('rooms').doc(callId).update({
+    await FirebaseFirestore.instance.collection('calls').doc(callId).update({
       'callStatus': 'declined',
     });
-
     hangUp();
     Get.back();
   }
@@ -347,9 +216,7 @@ class CallSignallingController extends GetxController {
   Future<void> hangUp() async {
     if (roomId == null) return;
 
-    FirebaseFirestore db = FirebaseFirestore.instance;
-    DocumentReference roomRef = db.collection('calls').doc(roomId);
-
+    var roomRef = FirebaseFirestore.instance.collection('calls').doc(roomId);
     await roomRef.update({'callStatus': 'ended'});
 
     await roomRef.collection('calleeCandidates').get().then((snapshot) {
@@ -371,39 +238,51 @@ class CallSignallingController extends GetxController {
 
   void registerPeerConnectionListeners({RTCVideoRenderer? remoteRenderer}) {
     peerConnection?.onTrack = (event) {
-      print("📥 Track received: \${event.track.kind}, ID: \${event.track.id}");
-
       if (event.streams.isNotEmpty) {
         final stream = event.streams.first;
         remoteStream.value = stream;
 
+        for (var track in stream.getTracks()) {
+          track.enabled = true;
+          print("✅ Forcing remote track enabled: ${track.kind}");
+        }
+
+        stream.getAudioTracks().forEach((track) {
+          print("🔊 Remote Audio Track: ID=${track.id}, ENABLED=${track.enabled}, MUTED=${track.muted}");
+        });
+
         if (remoteRenderer != null) {
+          remoteRenderer.srcObject = null;
           remoteRenderer.srcObject = stream;
-          print("✅ Renderer assigned in onTrack");
+          print("✅ Remote renderer assigned");
         }
 
-        if (event.track.kind == 'video') {
-          print("🎥 Remote video track received!");
-        }
-
-        if (event.track.kind == 'audio') {
-          print("🔊 Remote audio track received.");
-        }
+        print("📥 Track received: ${event.track.kind}, ID: ${event.track.id}");
       } else {
         print("⚠️ Received track without stream.");
       }
     };
 
-    peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
-      print('ICE gathering state changed: \$state');
+    peerConnection?.onIceCandidate = (candidate) {
+      if (roomId != null) {
+        FirebaseFirestore.instance
+            .collection('calls')
+            .doc(roomId)
+            .collection('candidates')
+            .add(candidate.toMap());
+      }
     };
 
-    peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
-      print('Connection state changed: \$state');
+    peerConnection?.onConnectionState = (state) {
+      print('🔗 Connection state: $state');
     };
 
-    peerConnection?.onSignalingState = (RTCSignalingState state) {
-      print('Signaling state changed: \$state');
+    peerConnection?.onSignalingState = (state) {
+      print('📶 Signaling state: $state');
+    };
+
+    peerConnection?.onIceGatheringState = (state) {
+      print('❄️ ICE gathering state: $state');
     };
   }
 }

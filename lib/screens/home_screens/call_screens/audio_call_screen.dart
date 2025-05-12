@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:get/get.dart';
@@ -26,10 +26,7 @@ class AudioCallScreen extends StatefulWidget {
 }
 
 class _AudioCallScreenState extends State<AudioCallScreen> {
-  final CallSignallingController _callController = Get.put(
-    CallSignallingController(),
-  );
-  webrtc.RTCVideoRenderer? _remoteAudioRenderer;
+  final CallSignallingController _callController = Get.find();
   bool isAudioOn = true;
   bool isCallEnded = false;
   Timer? _timeoutTimer;
@@ -42,102 +39,76 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
     _startCallTimeout();
   }
 
-  //initialize WebRTC sudio call
   Future<void> _initializeAudioCall() async {
     try {
-      await _callController.initializePeerConnection();
-
-      _callController.localStream = await webrtc.navigator.mediaDevices
-          .getUserMedia({'audio': true, 'video': false});
-
-      _callController.localStream!.getAudioTracks().forEach((track) {
+      await _callController.openUserMedia(video: false);
+      _callController.localStream?.getAudioTracks().forEach((track) {
         track.enabled = true;
-        print("🎙 Local Audio Enabled: ${track.label}");
+        print("🎙 Local Audio Enabled: \${track.label}");
       });
 
-      // ✅ Setup & store renderer early
-      _remoteAudioRenderer = webrtc.RTCVideoRenderer();
-      await _remoteAudioRenderer!.initialize();
-      
-      // ✅ Join room and attach remote audio to renderer in joinRoom
-      await _callController.joinRoom(widget.callId, _remoteAudioRenderer!);
+      await _callController.joinRoom(widget.callId, webrtc.RTCVideoRenderer());
     } catch (e) {
-      print("❌ Error initializing audio call: $e");
+      print("❌ Error initializing audio call: \$e");
     }
   }
 
-  //Listen for call status updates from firestore
   void _listenForCallStatus() {
     FirebaseFirestore.instance
         .collection('calls')
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-          if (snapshot.exists) {
-            String status = snapshot['callStatus'] ?? 'calling';
-            print("CALL STATUS: $status");
+      if (!snapshot.exists) return;
 
-            if (status == 'answered') {
-              _timeoutTimer?.cancel();
-              setState(() {
-                isCallEnded = false;
-                isAudioOn = true;
-              });
+      String status = snapshot['callStatus'] ?? 'calling';
+      print("CALL STATUS: \$status");
 
-              // 🔹 Ensure Local Audio is Enabled
-              _callController.localStream?.getAudioTracks().forEach((track) {
-                track.enabled = true;
-                print("🎙 Local Audio Unmuted: ${track.id}");
-              });
-
-              // 🔹 Ensure Remote Audio is Enabled
-              if (_callController.remoteStream.value != null) {
-                print("🔊 Ensuring Remote Audio is Active...");
-                _callController.remoteStream.value?.getAudioTracks().forEach((
-                  track,
-                ) {
-                  track.enabled = true;
-                });
-              }
-            }
-
-            if ((status == 'ended' || status == 'missed') && !isCallEnded) {
-              _endCall();
-            }
-          }
+      if (status == 'answered') {
+        _timeoutTimer?.cancel();
+        setState(() {
+          isCallEnded = false;
+          isAudioOn = true;
         });
-  }
 
-  //Missed call
-  void _startCallTimeout() {
-    _timeoutTimer = Timer(const Duration(seconds: 15), () async {
-      DocumentSnapshot callSnapshot =
-          await FirebaseFirestore.instance
-              .collection('calls')
-              .doc(widget.callId)
-              .get();
+        _callController.localStream?.getAudioTracks().forEach((track) {
+          track.enabled = true;
+          print("🎙 Local Audio Re-enabled: \${track.id}");
+        });
 
-      if (callSnapshot.exists) {
-        String status = callSnapshot['callStatus'] ?? 'calling';
+        _callController.remoteStream.value?.getAudioTracks().forEach((track) {
+          track.enabled = true;
+          print("🔊 Remote Audio Track: ID=\${track.id}, ENABLED=\${track.enabled}, MUTED=\${track.muted}");
+        });
+      }
 
-        // If still calling after 15 sec, mark as missed
-        if (status == 'calling') {
-          await FirebaseFirestore.instance
-              .collection('calls')
-              .doc(widget.callId)
-              .update({'callStatus': 'missed'});
-        }
+      if ((status == 'ended' || status == 'missed') && !isCallEnded) {
+        _endCall();
       }
     });
   }
 
-  //End the call and close the call screen
+  void _startCallTimeout() {
+    _timeoutTimer = Timer(const Duration(seconds: 15), () async {
+      DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.callId)
+          .get();
+
+      if (callSnapshot.exists && (callSnapshot['callStatus'] ?? 'calling') == 'calling') {
+        await FirebaseFirestore.instance
+            .collection('calls')
+            .doc(widget.callId)
+            .update({'callStatus': 'missed'});
+      }
+    });
+  }
+
   Future<void> _endCall() async {
     if (!isCallEnded) {
       setState(() {
         isCallEnded = true;
       });
-
       await _callController.hangUp();
       Get.back();
     }
@@ -146,8 +117,7 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
   @override
   void dispose() {
     _timeoutTimer?.cancel();
-    _remoteAudioRenderer?.dispose();
-    _callController.hangUp();
+    _callController.localStream?.dispose();
     super.dispose();
   }
 
@@ -179,11 +149,9 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              // Call Controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Mute/Unmute Button
                   IconButton(
                     icon: Icon(
                       isAudioOn ? Icons.mic : Icons.mic_off,
@@ -191,21 +159,15 @@ class _AudioCallScreenState extends State<AudioCallScreen> {
                       size: 50,
                     ),
                     onPressed: () {
-                      setState(() {
-                        isAudioOn = !isAudioOn;
-                        _callController
-                            .localStream
-                            ?.getAudioTracks()
-                            .first
-                            .enabled = isAudioOn;
-                      });
+                      setState(() => isAudioOn = !isAudioOn);
+                      _callController.localStream?.getAudioTracks().forEach(
+                        (track) => track.enabled = isAudioOn,
+                      );
                     },
                   ),
                   const SizedBox(width: 40),
-
-                  // End Call Button
                   IconButton(
-                    icon: Icon(Icons.call_end, color: Colors.red, size: 50),
+                    icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
                     onPressed: _endCall,
                   ),
                 ],

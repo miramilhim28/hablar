@@ -4,7 +4,6 @@ import 'package:hablar_clone/screens/home_screens/info_screen.dart';
 import 'package:hablar_clone/controllers/contact_controller.dart';
 import 'package:hablar_clone/controllers/favorites_controller.dart';
 import 'package:hablar_clone/models/favorite.dart';
-import 'package:hablar_clone/screens/home_screens/new_contact.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class ContactScreen extends StatelessWidget {
@@ -140,11 +139,6 @@ class ContactScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Get.to(() => NewContactScreen()),
-        backgroundColor: utils.pinkLilac,
-        child: Icon(Icons.add),
       ),
     );
   }

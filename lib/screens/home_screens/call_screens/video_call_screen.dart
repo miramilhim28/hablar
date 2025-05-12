@@ -1,8 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 import 'dart:async';
 
@@ -25,9 +26,9 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
-  final CallSignallingController _callController = Get.put(CallSignallingController());
-  webrtc.RTCVideoRenderer _localRenderer = webrtc.RTCVideoRenderer();
-  webrtc.RTCVideoRenderer _remoteRenderer = webrtc.RTCVideoRenderer();
+  final CallSignallingController _callController = Get.find();
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool isAudioOn = true;
   bool isVideoOn = true;
   bool isCallEnded = false;
@@ -43,20 +44,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _startCallTimeout();
   }
 
-  void _startCallTimer() {
-    if (!isCallEnded) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted && !isCallEnded) {
-          setState(() {
-            callDurationInSeconds += 1;
-          });
-          _startCallTimer();
-        }
-      });
-    }
-  }
-
-  void _initializeVideoCall() async {
+  Future<void> _initializeVideoCall() async {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
@@ -72,11 +60,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     });
 
     _localRenderer.srcObject = _callController.localStream;
-
-    print("🎥 Local video tracks:");
-    _callController.localStream?.getVideoTracks().forEach((track) {
-      print("Track ID: ${track.id}, Enabled: ${track.enabled}");
-    });
   }
 
   void _listenForCallStatus() {
@@ -85,73 +68,71 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists) {
-        String status = snapshot['callStatus'] ?? 'calling';
-        print("CALL STATUS: $status");
+      if (!snapshot.exists) return;
 
-        if (status == 'answered' && !isAnswered) {
-          _timeoutTimer?.cancel();
-          setState(() {
-            isAnswered = true;
-          });
-          print("Call was answered! Starting timer...");
-          _startCallTimer();
-        }
+      String status = snapshot['callStatus'] ?? 'calling';
 
-        if (_callController.remoteStream.value != null) {
-          print("🔊 Ensuring Remote Audio is Active...");
-          _callController.remoteStream.value?.getAudioTracks().forEach((track) {
-            track.enabled = true;
-          });
+      if (status == 'answered' && !isAnswered) {
+        _timeoutTimer?.cancel();
+        setState(() => isAnswered = true);
+        _startCallTimer();
+      }
 
-          // 🐛 DEBUG: Print all remote tracks
-          _callController.remoteStream.value?.getTracks().forEach((track) {
-            print("📺 Remote track: kind=${track.kind}, enabled=${track.enabled}");
-          });
+      if (_callController.remoteStream.value != null) {
+        _remoteRenderer.srcObject = null;
+        _remoteRenderer.srcObject = _callController.remoteStream.value;
 
-          _callController.remoteStream.value?.getVideoTracks().forEach((track) {
-            print("🎥 Remote video track: ${track.id}, enabled: ${track.enabled}");
-            track.enabled = true;
-          });
+        _callController.remoteStream.value?.getTracks().forEach((track) {
+          track.enabled = true;
+        });
 
-          // ✅ Force assign every time
-          _remoteRenderer.srcObject = _callController.remoteStream.value;
-          print("🎥 [FORCED] Remote stream assigned to renderer.");
-        }
+        _callController.remoteStream.value?.getAudioTracks().forEach((track) {
+          track.enabled = true;
+          print("🔊 Remote Audio Track: ID=${track.id}, ENABLED=${track.enabled}, MUTED=${track.muted}");
+        });
 
-        if ((status == 'ended' || status == 'missed') && !isCallEnded) {
-          _endCall();
-        }
+        _callController.remoteStream.value?.getVideoTracks().forEach((track) {
+          track.enabled = true;
+          print("🎥 Remote Video Track: ID=${track.id}, ENABLED=${track.enabled}");
+        });
+      }
+
+      if ((status == 'ended' || status == 'missed') && !isCallEnded) {
+        _endCall();
       }
     });
   }
 
+  void _startCallTimer() {
+    if (!isCallEnded) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted && !isCallEnded) {
+          setState(() => callDurationInSeconds++);
+          _startCallTimer();
+        }
+      });
+    }
+  }
+
   void _startCallTimeout() {
     _timeoutTimer = Timer(const Duration(seconds: 15), () async {
-      DocumentSnapshot callSnapshot = await FirebaseFirestore.instance
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
           .collection('calls')
           .doc(widget.callId)
           .get();
 
-      if (callSnapshot.exists) {
-        String status = callSnapshot['callStatus'] ?? 'calling';
-
-        if (status == 'calling') {
-          await FirebaseFirestore.instance
-              .collection('calls')
-              .doc(widget.callId)
-              .update({'callStatus': 'missed'});
-        }
+      if (snapshot.exists && (snapshot['callStatus'] ?? 'calling') == 'calling') {
+        await FirebaseFirestore.instance
+            .collection('calls')
+            .doc(widget.callId)
+            .update({'callStatus': 'missed'});
       }
     });
   }
 
   Future<void> _endCall() async {
     if (!isCallEnded) {
-      setState(() {
-        isCallEnded = true;
-      });
-
+      setState(() => isCallEnded = true);
       await _callController.hangUp();
       Get.back();
     }
@@ -189,9 +170,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       width: double.infinity,
                       height: double.infinity,
                       color: Colors.black,
-                      child: webrtc.RTCVideoView(
+                      child: RTCVideoView(
                         _remoteRenderer,
-                        objectFit: webrtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                       ),
                     ),
                     Positioned(
@@ -204,33 +185,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: webrtc.RTCVideoView(
+                        child: RTCVideoView(
                           _localRenderer,
                           mirror: true,
-                          objectFit: webrtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                         ),
                       ),
                     ),
                     Positioned(
                       top: 40,
-                      child: Column(
-                        children: [
-                          Text(
-                            isAnswered ? "In Call" : "Calling...",
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 16,
-                              color: utils.white,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        isAnswered ? "In Call" : "Calling...",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 16,
+                          color: utils.white,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 color: Colors.black,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -242,10 +219,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         size: 40,
                       ),
                       onPressed: () {
-                        setState(() {
-                          isAudioOn = !isAudioOn;
-                          _callController.localStream?.getAudioTracks().first.enabled = isAudioOn;
-                        });
+                        setState(() => isAudioOn = !isAudioOn);
+                        _callController.localStream?.getAudioTracks().forEach(
+                          (track) => track.enabled = isAudioOn,
+                        );
                       },
                     ),
                     IconButton(
@@ -255,14 +232,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         size: 40,
                       ),
                       onPressed: () {
-                        setState(() {
-                          isVideoOn = !isVideoOn;
-                          _callController.localStream?.getVideoTracks().first.enabled = isVideoOn;
-                        });
+                        setState(() => isVideoOn = !isVideoOn);
+                        _callController.localStream?.getVideoTracks().forEach(
+                          (track) => track.enabled = isVideoOn,
+                        );
                       },
                     ),
                     IconButton(
-                      icon: Icon(Icons.call_end, color: Colors.red, size: 40),
+                      icon: const Icon(Icons.call_end, color: Colors.red, size: 40),
                       onPressed: _endCall,
                     ),
                   ],

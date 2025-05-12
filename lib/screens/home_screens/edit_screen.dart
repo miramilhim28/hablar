@@ -55,8 +55,6 @@ class EditScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            Icon(Icons.add_a_photo, color: utils.darkPurple, size: 100),
-
             const SizedBox(height: 24),
 
             //name
