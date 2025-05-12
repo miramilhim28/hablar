@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 import 'package:hablar_clone/controllers/recents_controller.dart';
 import 'package:hablar_clone/models/recent_calls.dart';

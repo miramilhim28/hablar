@@ -1,7 +1,5 @@
-import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:confirm_dialog/confirm_dialog.dart';
 import 'package:hablar_clone/controllers/settings_controller.dart';
 import 'package:hablar_clone/screens/home_screens/settings_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;

@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/controllers/home_controller.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
