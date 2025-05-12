@@ -5,10 +5,7 @@ import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/call_signalling_controller.dart';
 import 'package:hablar_clone/controllers/auth_controller.dart';
 import 'package:hablar_clone/controllers/home_controller.dart';
-import 'package:hablar_clone/screens/landing_screen.dart';
 import 'package:hablar_clone/screens/splash_screen.dart';
-import 'screens/auth_screens/login_screen.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
