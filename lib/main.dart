@@ -2,10 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hablar_clone/controllers/call_signalling_controller.dart';
-import 'package:hablar_clone/controllers/auth_controller.dart';
-import 'package:hablar_clone/controllers/home_controller.dart';
-import 'package:hablar_clone/screens/splash_screen.dart';
+import 'package:hablar_clone/modules/call/controllers/call_signalling_controller.dart';
+import 'package:hablar_clone/modules/auth/controllers/auth_controller.dart';
+import 'package:hablar_clone/modules/home/controllers/home_controller.dart';
+import 'package:hablar_clone/modules/home/screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

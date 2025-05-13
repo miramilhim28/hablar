@@ -4,7 +4,6 @@ class Profile{
   final String email;
   final String password;
   final String phone;
-  //final String photoUrl;
   final String bio;
 
   const Profile({
@@ -12,7 +11,6 @@ class Profile{
     required this.email,
     required this.password,
     required this.phone,
-    //required this.photoUrl,
     required this.bio,
   });
 
@@ -21,7 +19,6 @@ class Profile{
     'email': email,
     'password': password,
     'phone': phone,
-    //'photoUrl': photoUrl,
     'bio': bio,
   };
 
