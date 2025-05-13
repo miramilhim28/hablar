@@ -50,7 +50,6 @@ class AuthController extends GetxController {
       model.User user = model.User(
         name: nameController.text,
         email: emailController.text,
-        photoUrl: '',
         password: passwordController.text,
         phone: '',
         uid: cred.user!.uid,

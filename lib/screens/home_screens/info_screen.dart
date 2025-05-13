@@ -20,7 +20,7 @@ class _InfoScreenState extends State<InfoScreen> {
   @override
   void initState() {
     super.initState();
-    controller.fetchContactData(contact.id); // Fetch contact info when screen opens
+    controller.fetchContactData(contact['id']);
   }
 
   @override

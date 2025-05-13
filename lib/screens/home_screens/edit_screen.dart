@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/controllers/settings_controller.dart';
 import 'package:hablar_clone/screens/home_screens/settings_screen.dart';
+import 'package:hablar_clone/screens/landing_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class EditScreen extends StatelessWidget {
@@ -175,7 +176,7 @@ class EditScreen extends StatelessWidget {
                             controller.phoneController.text,
                             controller.bioController.text,
                           );
-                          Get.off(() => SettingsScreen());
+                          Get.off(() => LandingScreen());
                         },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: utils.pinkLilac,

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:hablar_clone/models/user.dart' as model;
 import 'package:hablar_clone/controllers/favorites_controller.dart';
 import 'package:hablar_clone/models/contact.dart' as model;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hablar_clone/models/favorite.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:hablar_clone/screens/home_screens/info_screen.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 class ContactsController extends GetxController {
@@ -114,96 +116,75 @@ class ContactsController extends GetxController {
   }
 
   // Add a new contact to Firestore and update the current user's contact list
-  Future<void> addContact({required String name, required String phone}) async {
-    if (name.isEmpty || phone.isEmpty) {
+  Future<void> searchContact(String phone) async {
+  if (phone.isEmpty) {
+    Get.snackbar(
+      "Error",
+      "Please enter a phone number",
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    String normalizedPhone = phone;
+    try {
+      final parsed = PhoneNumber.parse(
+        phone,
+        destinationCountry: IsoCode.JO,
+      );
+      normalizedPhone = '+${parsed.countryCode}${parsed.getFormattedNsn()}';
+    } catch (_) {
+    }
+
+    QuerySnapshot<Map<String, dynamic>> querySnapshot = await _firestore
+        .collection('users')
+        .where('phone', isEqualTo: normalizedPhone)
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      querySnapshot = await _firestore
+          .collection('users')
+          .where('phone', isEqualTo: phone)
+          .get();
+    }
+
+    if (querySnapshot.docs.isEmpty) {
       Get.snackbar(
-        "Error",
-        "Please enter both name and phone number",
-        backgroundColor: Colors.red,
+        "Not Found",
+        "No user found with this phone number",
+        backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
       return;
     }
 
-    isLoading.value = true;
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        Get.snackbar(
-          "Error",
-          "No user is logged in",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return;
-      }
+    var userDoc = querySnapshot.docs.first;
+    var userData = userDoc.data();
 
-      // Normalize the phone number to E.164 format
-      String normalizedPhone;
-      try {
-        final parsed = PhoneNumber.parse(
-          phone,
-          destinationCountry: IsoCode.JO,
-        ); // replace with your country code
-        normalizedPhone = '+${parsed.countryCode}${parsed.getFormattedNsn()}';
-      } catch (e) {
-        Get.snackbar(
-          "Error",
-          "Invalid phone number format",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return;
-      }
+    final contact = {
+      'id': userDoc.id,
+      'name': userData['name'] ?? '',
+      'phone': userData['phone'] ?? '',
+      'email': userData['email'] ?? '',
+      'bio': userData['bio'] ?? '',
+    };
 
-      // Create a new contact object with normalized phone
-      model.Contact newContact = model.Contact(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: name,
-        phone: normalizedPhone,
-        email: "",
-        bio: "",
-      );
+    Get.to(() => const InfoScreen(), arguments: contact);
 
-      // Firestore operations
-      var userRef = _firestore.collection('users').doc(currentUser.uid);
-      var userSnapshot = await userRef.get();
-      if (!userSnapshot.exists) {
-        Get.snackbar(
-          "Error",
-          "User not found",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return;
-      }
-
-      List<dynamic> currentContacts = userSnapshot.data()?['contacts'] ?? [];
-      currentContacts.add(newContact.toJson());
-
-      await userRef.update({'contacts': currentContacts});
-
-      contacts.add(newContact);
-      filterContacts();
-
-      Get.back(); // Close the screen after adding
-      Get.snackbar(
-        "Success",
-        "Contact added successfully!",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-    } catch (err) {
-      Get.snackbar(
-        "Error",
-        err.toString(),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
+  } catch (err) {
+    Get.snackbar(
+      "Error",
+      err.toString(),
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // Filter Contacts Based on Search Input
   void filterContacts() {

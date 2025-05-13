@@ -5,7 +5,6 @@ import 'calls.dart';
 class User {
   final String name;
   final String email;
-  final String photoUrl;
   final String bio;
   final String password;
   final String phone;
@@ -18,7 +17,6 @@ class User {
   const User({
     required this.name,
     required this.email,
-    required this.photoUrl,
     required this.bio,
     required this.password,
     required this.phone,
@@ -32,7 +30,6 @@ class User {
   Map<String, dynamic> toJson() => {
         'name': name,
         'email': email,
-        'photoUrl': photoUrl,
         'bio': bio,
         'password': password,
         'phone': phone,
@@ -46,28 +43,35 @@ class User {
   static User fromSnap(DocumentSnapshot snap) {
     var snapshot = snap.data() as Map<String, dynamic>;
 
-    List<Contact> contactList =
-        (snapshot['contacts'] as List)
-            .map((contactData) => Contact.fromJson(contactData))
-            .toList();
+    List<Contact> contactList = [];
+    if (snapshot['contacts'] != null && snapshot['contacts'] is List) {
+      contactList = (snapshot['contacts'] as List)
+          .map((contactData) => Contact.fromJson(contactData))
+          .toList();
+    }
 
-    List<Call> callList =
-        (snapshot['calls'] as List)
-            .map((callData) => Call.fromJson(callData))
-            .toList();
+    List<Call> callList = [];
+    if (snapshot['calls'] != null && snapshot['calls'] is List) {
+      callList = (snapshot['calls'] as List)
+          .map((callData) => Call.fromJson(callData))
+          .toList();
+    }
 
     return User(
-      name: snapshot['name'],
-      email: snapshot['email'],
-      photoUrl: snapshot['photoUrl'],
-      bio: snapshot['bio'],
-      password: snapshot['password'],
-      phone: snapshot['phone'],
-      uid: snapshot['uid'],
-      werbRtcInfo: snapshot['werbRtcInfo'] ?? {},
+      name: snapshot['name'] is String ? snapshot['name'] : '',
+      email: snapshot['email'] is String ? snapshot['email'] : '',
+      bio: snapshot['bio'] is String ? snapshot['bio'] : '',
+      password: snapshot['password'] is String ? snapshot['password'] : '',
+      phone: snapshot['phone'] is String ? snapshot['phone'] : '',
+      uid: snapshot['uid'] is String ? snapshot['uid'] : '',
+      werbRtcInfo: snapshot['werbRtcInfo'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(snapshot['werbRtcInfo'])
+          : {},
       contacts: contactList,
       calls: callList,
-      favorites: List<String>.from(snapshot['favorites']),
+      favorites: snapshot['favorites'] is List
+          ? List<String>.from(snapshot['favorites'])
+          : [],
     );
   }
 }
