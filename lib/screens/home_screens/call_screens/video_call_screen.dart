@@ -172,6 +172,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       color: Colors.black,
                       child: RTCVideoView(
                         _remoteRenderer,
+                        mirror:false,
                         objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                       ),
                     ),
@@ -187,7 +188,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         ),
                         child: RTCVideoView(
                           _localRenderer,
-                          mirror: true,
+                          mirror: false,
                           objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                         ),
                       ),

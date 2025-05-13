@@ -188,7 +188,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 350),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -196,7 +196,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                   icon: const Icon(Icons.call, color: Colors.green, size: 50),
                   onPressed: _acceptCall,
                 ),
-                const SizedBox(width: 50),
+                const SizedBox(width: 100),
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red, size: 50),
                   onPressed: _declineCall,
