@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hablar_clone/contact/screens/info_screen.dart';
+import 'package:hablar_clone/modules/contact/screens/info_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
-import 'package:hablar_clone/contact/controllers/favorites_controller.dart';
+import 'package:hablar_clone/modules/contact/controllers/favorites_controller.dart';
 
 class FavoritesScreen extends StatelessWidget {
   final FavoritesController favoritesController = Get.put(

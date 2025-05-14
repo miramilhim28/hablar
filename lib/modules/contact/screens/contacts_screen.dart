@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hablar_clone/contact/screens/info_screen.dart';
-import 'package:hablar_clone/contact/controllers/contact_controller.dart';
-import 'package:hablar_clone/contact/controllers/favorites_controller.dart';
+import 'package:hablar_clone/modules/contact/screens/info_screen.dart';
+import 'package:hablar_clone/modules/contact/controllers/contact_controller.dart';
+import 'package:hablar_clone/modules/contact/controllers/favorites_controller.dart';
 import 'package:hablar_clone/models/favorite.dart';
-import 'package:hablar_clone/contact/screens/search_contact.dart';
+import 'package:hablar_clone/modules/contact/screens/search_contact.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
 class ContactScreen extends StatelessWidget {

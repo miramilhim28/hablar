@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hablar_clone/models/user.dart' as model;
-import 'package:hablar_clone/contact/controllers/favorites_controller.dart';
+import 'package:hablar_clone/modules/contact/controllers/favorites_controller.dart';
 import 'package:hablar_clone/models/contact.dart' as model;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hablar_clone/models/favorite.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
-import 'package:hablar_clone/contact/screens/info_screen.dart';
+import 'package:hablar_clone/modules/contact/screens/info_screen.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 class ContactsController extends GetxController {

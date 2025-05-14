@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hablar_clone/contact/controllers/info_controller.dart';
+import 'package:hablar_clone/modules/contact/controllers/info_controller.dart';
 import 'package:hablar_clone/modules/chat/screens/chat_msgs_screen.dart';
 import 'package:hablar_clone/modules/call/screens/join_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;

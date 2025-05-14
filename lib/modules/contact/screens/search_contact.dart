@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hablar_clone/contact/controllers/contact_controller.dart';
+import 'package:hablar_clone/modules/contact/controllers/contact_controller.dart';
 import 'package:hablar_clone/modules/home/screens/landing_screen.dart';
 import 'package:hablar_clone/utils/colors.dart' as utils;
 
